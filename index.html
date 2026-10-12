@@ -1,0 +1,1309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>World Model Research Log</title>
+<meta name="description" content="Every study we ran on fast world action models (Flash-WAM / LCM, MFD), on telling when a world model is wrong (D4RT, GeoBoN, gripper chatter, latent gap, gap predictor, test-time scaling), and on contact-conditioned world models (ContactGWM): hypotheses, designs, setups, numbers and verdicts.">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#fcfcfb; --surface:#ffffff; --surface-2:#f4f3f0; --border:#e4e2dc;
+  --text:#16160f; --text-2:#4d4c47; --text-3:#77756e;
+  --accent:#2a78d6; --accent-soft:#e8f1fc;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --grid:#e8e6e1;
+  --good:#0f7b3f; --good-bg:#e5f4ea; --bad:#b42318; --bad-bg:#fdecea;
+  --warn:#8a5a00; --warn-bg:#fdf3dc; --info:#1c5cab; --info-bg:#e8f1fc;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme: dark;
+    --bg:#141413; --surface:#1c1c1b; --surface-2:#242422; --border:#34332f;
+    --text:#f0efec; --text-2:#c3c2b7; --text-3:#94928a;
+    --accent:#5598e7; --accent-soft:#1b2a3d;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --grid:#2f2e2b;
+    --good:#5fd08f; --good-bg:#16301f; --bad:#ff8a80; --bad-bg:#3a1a17;
+    --warn:#f0b54a; --warn-bg:#352a12; --info:#86b6ef; --info-bg:#1b2a3d;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-text-size-adjust:100%}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.88em;background:var(--surface-2);padding:.1em .35em;border-radius:4px;overflow-wrap:anywhere}
+pre{font-family:var(--mono);font-size:.84em;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;line-height:1.5}
+pre code{background:none;padding:0}
+h1,h2,h3,h4{line-height:1.25;margin:1.6em 0 .5em}
+h1{font-size:2.1rem;margin:0 0 .3em;letter-spacing:-.01em}
+h2{font-size:1.55rem;padding-top:.6em;border-top:1px solid var(--border);margin-top:2.4em}
+h3{font-size:1.2rem}
+h4{font-size:1rem;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em;font-size:.8rem;margin-top:1.8em}
+p,li{color:var(--text)}
+.muted{color:var(--text-3)}
+.small{font-size:.88rem}
+
+.layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:40px;max-width:1240px;margin:0 auto;padding:0 24px}
+nav.toc{position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto;padding:28px 0 40px;font-size:.88rem}
+nav.toc .toc-title{font-weight:600;color:var(--text-2);margin-bottom:8px}
+nav.toc ol{list-style:none;margin:0;padding:0}
+nav.toc li{margin:0}
+nav.toc a{display:block;padding:3px 8px;border-radius:6px;color:var(--text-2);text-decoration:none}
+nav.toc a:hover{background:var(--surface-2);color:var(--text)}
+nav.toc .grp{margin:14px 0 4px;padding:0 8px;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);font-weight:600}
+main{min-width:0;padding:36px 0 80px;max-width:860px}
+
+header.hero{padding:8px 0 8px}
+header.hero .kicker{color:var(--accent);font-weight:600;font-size:.85rem;letter-spacing:.05em;text-transform:uppercase}
+header.hero p.lede{font-size:1.1rem;color:var(--text-2);max-width:62ch}
+.meta{font-size:.85rem;color:var(--text-3)}
+
+.table-wrap{overflow-x:auto;margin:14px 0 18px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.88rem;font-variant-numeric:tabular-nums}
+th,td{padding:7px 11px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;color:var(--text-2);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td.n,th.n{text-align:right;white-space:nowrap}
+tr.hl td{background:var(--accent-soft)}
+caption{caption-side:bottom;text-align:left;padding:8px 11px;color:var(--text-3);font-size:.8rem}
+
+.study{margin-top:3em}
+.study-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px}
+.study-head h3{margin:0}
+.facts{display:grid;grid-template-columns:150px minmax(0,1fr);gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:16px 0;background:var(--surface)}
+.facts>div{padding:9px 13px;border-bottom:1px solid var(--border)}
+.facts>div:nth-last-child(-n+2){border-bottom:none}
+.facts .k{background:var(--surface-2);font-weight:600;color:var(--text-2);font-size:.85rem}
+.facts ul{margin:0;padding-left:1.1em}
+.facts p{margin:0}
+
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:.75rem;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
+.chip.ok{color:var(--good);background:var(--good-bg)}
+.chip.no{color:var(--bad);background:var(--bad-bg)}
+.chip.mid{color:var(--warn);background:var(--warn-bg)}
+.chip.run{color:var(--info);background:var(--info-bg)}
+
+.verdict{border-left:4px solid var(--border);background:var(--surface);border-radius:0 10px 10px 0;padding:12px 16px;margin:18px 0;border-top:1px solid var(--border);border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+.verdict.ok{border-left-color:var(--good)}
+.verdict.no{border-left-color:var(--bad)}
+.verdict.mid{border-left-color:var(--warn)}
+.verdict.run{border-left-color:var(--info)}
+.verdict p:first-child{margin-top:0}.verdict p:last-child{margin-bottom:0}
+.verdict .vt{font-weight:700;margin-right:6px}
+
+.callout{background:var(--surface-2);border-radius:10px;padding:12px 16px;margin:16px 0;font-size:.95rem}
+.callout p{margin:.3em 0}
+
+figure{margin:20px 0}
+figure img{width:100%;height:auto;border-radius:8px;border:1px solid var(--border);background:#fcfcfb}
+figcaption{font-size:.82rem;color:var(--text-3);margin-top:6px}
+.vgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.vgrid video{width:100%;border-radius:8px;border:1px solid var(--border);background:#000}
+.vgrid figure{margin:0}
+
+.chart{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:14px 14px 8px;margin:16px 0}
+.chart .ct{font-weight:600;font-size:.95rem}
+.chart .cs{font-size:.8rem;color:var(--text-3);margin-bottom:6px}
+.chart svg{width:100%;height:auto;display:block;overflow:visible}
+.chart .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.8rem;color:var(--text-2);margin:4px 0 6px}
+.chart .legend span::before{content:"";display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle;background:var(--c)}
+.chart .legend span.sq::before{height:10px;width:10px}
+svg .grid{stroke:var(--grid);stroke-width:1}
+svg .axis{fill:var(--text-3);font-size:11px}
+svg .lbl{fill:var(--text-2);font-size:11px}
+svg .s1{stroke:var(--s1);fill:var(--s1)} svg .s2{stroke:var(--s2);fill:var(--s2)} svg .s3{stroke:var(--s3);fill:var(--s3)}
+svg path.line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+svg circle{stroke:var(--surface);stroke-width:2}
+svg .ref{stroke:var(--text-3);stroke-width:1}
+svg rect.bar{stroke:none}
+
+.map td:first-child{white-space:nowrap}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0}
+.card{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface)}
+.card .big{font-size:1.6rem;font-weight:650;line-height:1.1}
+.card .lab{font-size:.8rem;color:var(--text-3);margin-top:4px}
+footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--border);font-size:.85rem;color:var(--text-3)}
+
+.toc-toggle{display:none}
+@media (max-width: 900px){
+  .layout{grid-template-columns:minmax(0,1fr);padding:0 16px;gap:0}
+  nav.toc{position:static;max-height:none;padding:16px 0 0}
+  nav.toc ol{display:none}
+  nav.toc.open ol{display:block}
+  .toc-toggle{display:inline-block;font:inherit;font-size:.85rem;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text)}
+  nav.toc .toc-title{display:none}
+  main{padding-top:16px}
+  h1{font-size:1.7rem}
+  .facts{grid-template-columns:minmax(0,1fr)}
+  .facts>div:nth-last-child(2){border-bottom:1px solid var(--border)}
+  .cards{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .vgrid{grid-template-columns:minmax(0,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Contents">
+  <button class="toc-toggle" onclick="this.parentNode.classList.toggle('open')" aria-expanded="false">Contents ☰</button>
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#map">All studies at a glance</a></li>
+    <li><a href="#setup">Shared setup &amp; glossary</a></li>
+    <li class="grp">A · Making WAMs fast</li>
+    <li><a href="#s-lcm">A1 · LCM: Flash-WAM replication</a></li>
+    <li><a href="#s-mfd">A2 · MFD vs LCM</a></li>
+    <li><a href="#s-mfd-diag">A3 · Why is MFD worse?</a></li>
+    <li><a href="#s-proxy">A4 · Held-out error as a proxy</a></li>
+    <li><a href="#s-ladder">A5 · Teacher step ladder</a></li>
+    <li class="grp">B · Knowing when a WAM is wrong</li>
+    <li><a href="#s-d4rt">B1 · D4RT cycle consistency</a></li>
+    <li><a href="#s-geobon">B2 · GeoBoN cross-view depth</a></li>
+    <li><a href="#s-chatter">B3 · Gripper chatter</a></li>
+    <li><a href="#s-gap">B4 · Imagined-vs-real latent gap</a></li>
+    <li><a href="#s-pred">B5 · Predicting the gap</a></li>
+    <li><a href="#s-tts">B6 · Test-time scaling (best-of-N)</a></li>
+    <li class="grp">C · ContactGWM</li>
+    <li><a href="#s-cop">C1 · Contact operator vs physics</a></li>
+    <li><a href="#s-mve">C2 · Which action interface transfers?</a></li>
+    <li><a href="#s-nearmiss">C3 · Hit-vs-miss decodability</a></li>
+    <li><a href="#s-scaling">C4 · Embodiment-scaling kill switch</a></li>
+    <li><a href="#s-gonogo">C5 · Novelty check &amp; GO/NO-GO</a></li>
+    <li class="grp">Wrap-up</li>
+    <li><a href="#lessons">Lessons &amp; silent bugs</a></li>
+    <li><a href="#open">Open questions</a></li>
+    <li><a href="#credits">Credits</a></li>
+  </ol>
+</nav>
+<main>
+<header class="hero" id="overview">
+  <div class="kicker">Research log · world models for robot manipulation</div>
+  <h1>Fast, checkable and embodiment-agnostic world models</h1>
+  <p class="lede">Every study we ran, with its hypothesis, design, setup, models and data, the numbers we got, and whether they support or contradict what we expected. That includes the ones that failed.</p>
+  <p class="meta">Last updated 12 October 2026 · 4 × RTX A6000 (48 GB) · 400+ GPU-hours of training and evaluation · ~1,000 world-model rollouts in simulation · 72 ContactGWM training runs</p>
+</header>
+
+<p>The work runs in three threads.</p>
+<ul>
+  <li><strong>Thread A: making world action models fast.</strong> A <em>world action model</em> (WAM) controls a robot by imagining a short video of the future and the actions that go with it. LingBot-VA is accurate but needs 77 network passes per action chunk. <a href="https://arxiv.org/abs/2606.05254">Flash-WAM</a> distils it to 4 passes with latent consistency distillation (LCM). We checked those claims, then replaced the LCM loss with <a href="https://arxiv.org/abs/2606.11155">Mean Flow Distillation</a> (MFD) and asked whether a newer loss teaches a better student.</li>
+  <li><strong>Thread B: knowing when a world model is wrong.</strong> A WAM imagines before it acts. Can we look at what it imagined, alone or against reality, and tell whether the attempt will fail? We tried five signals: 3D cycle consistency (D4RT), cross-camera depth agreement (GeoBoN), gripper chatter, the gap between imagined and real video, and a learned predictor of that gap. We then used the predictor for best-of-N test-time scaling.</li>
+  <li><strong>Thread C: ContactGWM.</strong> For an object-centric world model, is the trajectory of <em>3D contact points on the object surface</em> a better action interface than end-effector pose or the actor's own geometry when the robot body changes? We tested this in simulation with a minimal world model, across 10 embodiments and 72 training runs.</li>
+</ul>
+
+<div class="cards">
+  <div class="card"><div class="big">19.1×</div><div class="lab">Flash-WAM speed-up measured on our hardware (paper: 23.3×)</div></div>
+  <div class="card"><div class="big">94% vs 75%</div><div class="lab">LIBERO-Long success: LCM student vs MFD student (100 episodes each)</div></div>
+  <div class="card"><div class="big">AUC 0.80</div><div class="lab">Imagined-vs-real latent gap flags failures; pre-registered, 70 fresh rollouts, p = 0.0001</div></div>
+  <div class="card"><div class="big">AUC 0.60</div><div class="lab">Gripper chatter on fresh data (0.79 in discovery); pre-registered test not passed</div></div>
+  <div class="card"><div class="big">8–11%</div><div class="lab">Lead of 3D contact conditioning over actor geometry on unseen embodiments (action-critical chunks), flat from 3 to 8 training bodies</div></div>
+  <div class="card"><div class="big">17 → 5</div><div class="lab">The teacher is still 10/10 at 17 passes; it only breaks at 5 (1 video + 2 action steps)</div></div>
+</div>
+
+<h2 id="map">All studies at a glance</h2>
+<div class="table-wrap"><table class="map">
+<thead><tr><th>#</th><th>Study</th><th>Question</th><th>Verdict</th><th>Headline number</th></tr></thead>
+<tbody>
+<tr><td><a href="#s-lcm">A1</a></td><td>LCM (Flash-WAM) replication</td><td>Does LCM distillation give ~20× speed at teacher-level skill?</td><td><span class="chip ok">✓ Supported</span></td><td>19.1× at 1v/1a; 96.7% vs teacher 100% at 1v/2a (RoboTwin, 30 trials)</td></tr>
+<tr><td><a href="#s-mfd">A2</a></td><td>MFD vs LCM</td><td>Does swapping the LCM loss for MFD give a better student?</td><td><span class="chip no">✗ Refuted</span></td><td>LIBERO-Long 75.0% vs 94.0%</td></tr>
+<tr><td><a href="#s-mfd-diag">A3</a></td><td>MFD diagnosis</td><td>Is MFD's deficit caused by the learning rate or by how its samples are built?</td><td><span class="chip no">✗ Both ruled out</span></td><td>3× LR: action MSE 13× worse; fixed sample: 67% worse</td></tr>
+<tr><td><a href="#s-proxy">A4</a></td><td>Held-out error as a proxy</td><td>Does held-out reconstruction error rank students by task success?</td><td><span class="chip mid">◐ Only action error does</span></td><td>Video error favoured MFD by 41%; success went the other way</td></tr>
+<tr><td><a href="#s-ladder">A5</a></td><td>Teacher denoising-step ladder</td><td>Does the teacher need all 77 passes?</td><td><span class="chip no">✗ No</span></td><td>10/10 at 77, 57, 37 and 17 passes; 6/10 at 5</td></tr>
+<tr><td><a href="#s-d4rt">B1</a></td><td>OpenD4RT cycle consistency</td><td>Does 3D-tracking consistency of imagined video predict success?</td><td><span class="chip no">✗ Refuted</span></td><td>ρ = −0.01 (150 rollouts); balanced AUC 0.51</td></tr>
+<tr><td><a href="#s-geobon">B2</a></td><td>GeoBoN cross-view depth</td><td>Does head/wrist depth agreement predict success?</td><td><span class="chip no">✗ Refuted</span></td><td>Matched vs mismatched views: AUC 0.50–0.53</td></tr>
+<tr><td><a href="#s-chatter">B3</a></td><td>Gripper chatter</td><td>Do hesitant gripper actions flag failure?</td><td><span class="chip no">✗ Not confirmed</span></td><td>0.79 in discovery, 0.60 on fresh data (p = 0.066)</td></tr>
+<tr><td><a href="#s-gap">B4</a></td><td>Imagined-vs-real latent gap</td><td>Is the imagined-vs-real gap larger when a rollout fails?</td><td><span class="chip ok">✓ Confirmed</span></td><td>Within-task AUC 0.80, p = 0.0001 (pre-registered)</td></tr>
+<tr><td><a href="#s-pred">B5</a></td><td>Gap predictor (Phases 1–2)</td><td>Can the gap be predicted before acting?</td><td><span class="chip mid">◐ Partly</span></td><td>Tracks the gap (ρ 0.67); flags failures no better than a free signal</td></tr>
+<tr><td><a href="#s-tts">B6</a></td><td>Test-time scaling (best-of-N)</td><td>Does picking the lowest-predicted-gap candidate raise success?</td><td><span class="chip run">● Running</span></td><td>All 4 diversity gates failed (0.008–0.078 &lt; 0.10); teacher main run in progress</td></tr>
+<tr><td><a href="#s-cop">C1</a></td><td>Contact operator vs PhysX</td><td>Does a purely geometric contact extractor match the physics engine?</td><td><span class="chip ok">✓ Supported</span></td><td>Recall 1.000, precision 0.912 at δ = 2 mm</td></tr>
+<tr><td><a href="#s-mve">C2</a></td><td>Action interface transfer (MVE)</td><td>Does 3D contact conditioning beat EE pose and actor geometry on unseen embodiments?</td><td><span class="chip ok">✓ Supported</span></td><td>20.7% lower OOD error than the best baseline</td></tr>
+<tr><td><a href="#s-nearmiss">C3</a></td><td>Hit-vs-miss decodability</td><td>Can you tell from the action alone whether the object will move?</td><td><span class="chip ok">✓ Supported</span></td><td>Contact AUC 0.987–0.998 vs EE pose 0.51–0.55</td></tr>
+<tr><td><a href="#s-scaling">C4</a></td><td>Embodiment-scaling kill switch</td><td>Does contact's margin vanish as training embodiments grow?</td><td><span class="chip mid">◐ Holds where action matters</span></td><td>Action-critical: 10.2% at N = 8 (halving predicts 4.2%); moving chunks: 11.0% → 4.2%</td></tr>
+<tr><td><a href="#s-gonogo">C5</a></td><td>Novelty check &amp; GO/NO-GO</td><td>Is the headline claim still open, and is the project feasible?</td><td><span class="chip mid">◐ Conditional GO</span></td><td>DexWM / μ₀ published the headline; reframed as sufficiency + harm</td></tr>
+</tbody></table></div>
+
+<p class="small muted">✓ = the data supports the hypothesis · ✗ = the data contradicts it · ◐ = mixed or partial · ● = experiment still running. Every verdict links to the full write-up below.</p>
+
+<h2 id="setup">Shared setup &amp; glossary</h2>
+
+<h3>Models</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Model</th><th>What it is</th><th>Used in</th></tr></thead>
+<tbody>
+<tr><td><strong>LingBot-VA</strong> (teacher)</td><td>A 5.1 B-parameter autoregressive video–action world model built on Wan2.2. It generates a chunk of future video latents and the matching action chunk jointly, then conditions on the real observation and generates the next chunk. Default: 25 video + 50 action denoising steps with classifier-free guidance, 77 forward passes per chunk. Public checkpoints for RoboTwin and LIBERO-Long.</td><td>A1, A5, B1–B3, B6</td></tr>
+<tr><td><strong>Flash-WAM</strong> (Akbari et al., 2026)</td><td>LingBot-VA distilled with <em>modality-aware</em> LCM: a separate consistency function per modality (linear-gradient scaling for the low-noise action stream, variance-preserving for the high-noise video stream). 1 video + 1–2 action steps, no guidance. Public RoboTwin checkpoint only.</td><td>A1, B4–B6</td></tr>
+<tr><td><strong>Our LCM student (LIBERO)</strong></td><td>Trained with the Flash-WAM recipe because no LIBERO student was released. 2,000 steps on 4 GPUs.</td><td>A2–A4</td></tr>
+<tr><td><strong>Our MFD students</strong></td><td>The same student and teacher with the LCM loss replaced by Mean Flow Distillation. Trained on RoboTwin and LIBERO.</td><td>A2–A4, B1</td></tr>
+<tr><td><strong>OpenD4RT</strong>, <strong>VGGT-Ω</strong></td><td>Frozen 3D-vision models: an open re-implementation of D4RT (4D point tracking, 1.16 B params) and a feed-forward multi-view depth and pose model.</td><td>B1, B2</td></tr>
+<tr><td><strong>ContactGWM MVE</strong></td><td>A 1.9 M-parameter transformer: object surface-point tokens plus action tokens → future object SE(3) pose. Only the action encoder changes between conditions.</td><td>C2–C4</td></tr>
+</tbody></table></div>
+
+<h3>Benchmarks</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Benchmark</th><th>Robot</th><th>Details</th></tr></thead>
+<tbody>
+<tr><td><strong>RoboTwin 2.0</strong></td><td>Dual-arm (7 joints + gripper per arm)</td><td>50 tasks. <code>demo_clean</code> (fixed scenes) and the harder <code>demo_randomized</code>. 3 cameras (head + 2 wrists), 256×320. Episodes end on success or at a step cap.</td></tr>
+<tr><td><strong>LIBERO-Long</strong></td><td>Single Franka arm</td><td>10 long, multi-stage household tasks. 2 cameras (agent view + eye-in-hand), 128×128.</td></tr>
+<tr><td><strong>ContactGWM sim</strong></td><td>10 kinematic "embodiments"</td><td>SAPIEN / ManiSkill3, 16 YCB objects, non-prehensile pushes with 25% deliberate near-misses. 5,954 episodes, 83 k chunks.</td></tr>
+</tbody></table></div>
+
+<h3>Terms used throughout</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>Forward passes (NFE)</td><td>Network evaluations per action chunk = N<sub>v</sub> + N<sub>a</sub> + 2, where <code>N<sub>v</sub>/N<sub>a</sub></code> are the video / action denoising steps. Teacher: 25/50 = 77 passes, each doubled by guidance. Low-NFE settings: 1/2 = 5 passes, 1/1 = 4 passes. Run names like <code>teacher_4</code> or <code>lcm_4</code> in our older logs refer to the 1/2 setting, which is really 5 passes; this page uses the true count.</td></tr>
+<tr><td>Rollout / trial</td><td>One full attempt at a task. Success is judged by the simulator.</td></tr>
+<tr><td>Chunk</td><td>The model imagines a chunk, the robot executes that chunk's actions, the real frames are fed back, and the model imagines the next chunk.</td></tr>
+<tr><td>AUC (failure-flagging)</td><td>P(a randomly chosen failure scores higher than a randomly chosen success). 0.5 = no signal, 1.0 = perfect.</td></tr>
+<tr><td>Within-task AUC</td><td>Scores are converted to percentile ranks <em>inside each task</em> and then pooled, so a scene that simply looks different cannot fake a success/failure difference.</td></tr>
+<tr><td>Pre-registration</td><td>The exact test, data and pass mark are committed to git <em>before</em> the confirmation data exists. The commit timestamp is the proof.</td></tr>
+<tr><td>Action-critical chunk</td><td>(ContactGWM) A chunk where constant-velocity extrapolation misses by more than 2 mm, i.e. one where the action can matter at all. 21–31% of the data.</td></tr>
+</tbody></table></div>
+
+<h2 id="thread-a">Thread A · Making world action models fast</h2>
+<p>LingBot-VA starts each action chunk from noise and refines it over many denoising steps, which takes ~11 s per chunk on our GPUs. That is far too slow for a robot that has to react. <em>Distillation</em> trains a fast student to jump straight to where the slow teacher ends up. How the student is scored during training (the loss) is the variable studied in this thread.</p>
+
+<h3 id="methods-a">How the two distillation losses work (as implemented)</h3>
+<div class="table-wrap"><table>
+<thead><tr><th></th><th>LCM: Flash-WAM, modality-aware</th><th>MFD: Mean Flow Distillation (ours, ported)</th></tr></thead>
+<tbody>
+<tr><td><strong>Networks</strong></td><td>Frozen teacher; trainable student; target = EMA of the student (decay 0.995).</td><td>Frozen teacher u<sup>Q</sup>; trainable full student θ; auxiliary flow v<sup>P</sup> = teacher + LoRA (adapters off ⇒ bitwise teacher). No EMA.</td></tr>
+<tr><td><strong>Training signal</strong></td><td>Self-consistency across one teacher ODE jump. Partner index i + k with k = 1000 / 2 = 500. The teacher takes one Euler step x<sub>σs</sub> → x<sub>σe</sub>, with CFG w ~ U[2, 10] on video only.</td><td>Mean-flow matching. Draw t = max(u₁,u₂), r = min(u₁,u₂); x<sub>t</sub> = (1−t)Z + tε, where Z = x<sub>σ</sub> − σ·v<sub>θ</sub> is the student's sample. Mean flow U = (x<sub>t</sub> − x<sub>r</sub>)/(t − r) by explicit Euler with ⌈(t−r)/0.02⌉ substeps, computed twice: u<sub>q</sub> with the teacher (CFG 4.5 on video) and u<sub>p</sub> with v<sup>P</sup>.</td></tr>
+<tr><td><strong>Video target</strong></td><td>f(x,σ) = c<sub>skip</sub>·x + c<sub>out</sub>·(x − σv), with c<sub>skip</sub> = σ<sub>d</sub>²/(σ²+σ<sub>d</sub>²), c<sub>out</sub> = σσ<sub>d</sub>/√(σ²+σ<sub>d</sub>²), σ<sub>d</sub> = 0.5 (Karras boundary condition). Student at (x<sub>σs</sub>, σs) vs EMA target at (x<sub>σe</sub>, σe).</td><td rowspan="2">Surrogate loss mean(sg(u<sub>q</sub> − u<sub>p</sub>)·x<sub>t</sub>), video plus a masked action term. Its scalar value is meaningless; its gradient pushes the student's samples along the teacher-minus-student flow difference. The interpretable metric is <code>gap</code> = RMS(u<sub>q</sub> − u<sub>p</sub>). v<sup>P</sup> is trained by flow matching on gradient-free student samples.</td></tr>
+<tr><td><strong>Action target</strong></td><td>x̂₀ parameterisation f<sub>a</sub> = a<sub>σ</sub> − σ·v<sub>a</sub>. The action stream sits at low noise (action SNR shift 1.0 on RoboTwin, 0.05 on LIBERO; video shift 5.0).</td></tr>
+<tr><td><strong>Loss</strong></td><td>Pseudo-Huber (c = 0.001): L = L<sub>video</sub> + 1.0·L<sub>action</sub> + 0.01·L<sub>aa</sub>, where L<sub>aa</sub> is a masked flow-matching MSE anchoring the student's action velocity. Ablation modes in the released code: <code>joint</code> = without L<sub>aa</sub>; <code>video</code> = L<sub>video</sub> only; <code>video_action_aware</code> = L<sub>video</sub> + L<sub>aa</sub>.</td><td>Alternating cycle, 50 auxiliary : 20 student optimizer steps (step mod 70). The (r, t) draw is seeded from (seed, step, cycle) so all ranks run the same number of substeps.</td></tr>
+<tr><td><strong>Shared settings</strong></td><td colspan="2">bf16, batch 1 per GPU, 1,000 train timesteps, AdamW (fused, β₁ 0.9), max grad-norm 2.0, FSDP + activation checkpointing. RoboTwin: 256×320, 3 cameras, chunk 2 frames × 16 actions, LR 5e-6, β₂ 0.999. LIBERO: 128×128, 2 cameras, chunk 4 × 4, LR 1e-5, β₂ 0.95, weight decay 0.1.</td></tr>
+</tbody></table></div>
+
+
+<!-- ============================ A1 ============================ -->
+<section class="study" id="s-lcm">
+<div class="study-head"><h3>A1 · LCM: replicating Flash-WAM</h3><span class="chip ok">✓ Supported</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>Flash-WAM's modality-aware LCM distillation makes LingBot-VA ~20× faster per chunk while keeping teacher-level task success, and the gain comes from distillation itself, not just from running fewer steps.</p></div>
+  <div class="k">Research questions</div><div><ul>
+    <li><strong>RQ1</strong> How large is the speed-up on our hardware (paper: 23.3×, 8.1 s → 348 ms on an L40S)?</li>
+    <li><strong>RQ2</strong> Does the low-NFE student keep the teacher's success rate?</li>
+    <li><strong>RQ3</strong> Does distillation beat simply running the <em>teacher</em> at the same low budget (1 video + 2 action steps)? The paper never tests this control.</li></ul></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li><strong>Latency:</strong> per-chunk denoising time in bf16, 6 timed chunks after 2 warm-ups, single-rank FSDP, for every N<sub>v</sub>/N<sub>a</sub>/CFG configuration.</li>
+    <li><strong>Success:</strong> 3 RoboTwin tasks, one per horizon class, 10 trials each, under four conditions: teacher (25v/50a, 77 passes), teacher cut to 1v/2a (5 passes, no training, the control), Flash-WAM 1v/2a (5 passes), and Flash-WAM 1v/1a (4 passes). Same start seed (10000) in every condition, so trial <em>i</em> starts from the same scene.</li>
+    <li>Statistic for the key contrast: Fisher's exact test.</li></ul></div>
+  <div class="k">Setup</div><div><p>4 × RTX A6000 48 GB, driver 550, CUDA 12.4. Flash-WAM commit <code>5b8df13</code>, RoboTwin 2.0 <code>2eeec322</code>. Model server: torch 2.9.0. Simulators: torch 2.4.1, in a separate environment.</p></div>
+  <div class="k">Models &amp; data</div><div><p>Teacher <code>lingbot-va-posttrain-robotwin</code>; student <code>FlashWAM-RoboTwin</code> (public). RoboTwin <code>demo_clean</code>: <code>adjust_bottle</code> (H1, 400-step cap), <code>pick_dual_bottles</code> (H2, 400), <code>stack_blocks_three</code> (H3, 1,200). No LIBERO student was released, so we trained our own with the same recipe (see A2).</p></div>
+</div>
+
+<h4>Results · latency per chunk</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Config</th><th class="n">N<sub>v</sub></th><th class="n">N<sub>a</sub></th><th class="n">CFG</th><th class="n">Passes / chunk</th><th class="n">Denoise (ms)</th><th class="n">ms / pass</th><th class="n">Speed-up</th></tr></thead>
+<tbody>
+<tr><td>Teacher</td><td class="n">25</td><td class="n">50</td><td class="n">5</td><td class="n">77 × batch 2</td><td class="n">11,310.8 ± 167</td><td class="n">146.9</td><td class="n">1.00×</td></tr>
+<tr><td>Teacher at low NFE</td><td class="n">1</td><td class="n">2</td><td class="n">5</td><td class="n">5 × b2</td><td class="n">743.2 ± 7</td><td class="n">148.6</td><td class="n">15.22×</td></tr>
+<tr><td>Teacher at low NFE</td><td class="n">1</td><td class="n">1</td><td class="n">5</td><td class="n">4 × b2</td><td class="n">606.5 ± 7</td><td class="n">151.6</td><td class="n">18.65×</td></tr>
+<tr><td>Flash-WAM</td><td class="n">1</td><td class="n">2</td><td class="n">1</td><td class="n">5 × b1</td><td class="n">722.2 ± 7</td><td class="n">144.4</td><td class="n">15.66×</td></tr>
+<tr class="hl"><td><strong>Flash-WAM</strong></td><td class="n">1</td><td class="n">1</td><td class="n">1</td><td class="n">4 × b1</td><td class="n"><strong>593.5 ± 6</strong></td><td class="n">148.4</td><td class="n"><strong>19.06×</strong></td></tr>
+<tr><td>MFD (ours)</td><td class="n">1</td><td class="n">2</td><td class="n">1</td><td class="n">5 × b1</td><td class="n">699.0</td><td class="n">—</td><td class="n">16.18×</td></tr>
+<tr><td>MFD (ours)</td><td class="n">1</td><td class="n">1</td><td class="n">1</td><td class="n">4 × b1</td><td class="n">543.3 ± 3.6</td><td class="n">135.8</td><td class="n">20.82×</td></tr>
+</tbody>
+<caption>Time per pass is flat (144–152 ms) across all configurations, including guidance's batch-2 passes. At these token counts the transformer is latency-bound, so the speed-up is simply the ratio of passes: 77 ÷ 4 = 19.25, and we measured 19.06. On the paper's L40S, guidance costs ~20% extra, which explains its 23.3×. MFD's 543 ms vs Flash-WAM's 593 ms is checkpoint noise, since both run 4 passes. Including the ~290 ms KV-cache update, a full chunk takes 11,603 ms (teacher), 883 ms (Flash-WAM 1v/1a) and 808 ms (MFD 1v/1a). Peak memory without offload: 44.1 GB (teacher) vs 34.8 GB (students). Note that the success evaluations below run students at 1v/2a (722 ms, 15.7×); the 19× headline is the 1v/1a setting.</caption>
+</table></div>
+
+<h4>Results · task success (RoboTwin <code>demo_clean</code>, 10 trials per cell)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Task</th><th>Horizon</th><th class="n">Step cap</th><th class="n">Teacher 25v/50a (77)</th><th class="n">Teacher 1v/2a (5), control</th><th class="n">Flash-WAM 1v/2a (5)</th><th class="n">Flash-WAM 1v/1a (4)</th></tr></thead>
+<tbody>
+<tr><td><code>adjust_bottle</code></td><td>H1</td><td class="n">400</td><td class="n">10/10</td><td class="n">10/10</td><td class="n">10/10</td><td class="n">10/10</td></tr>
+<tr><td><code>pick_dual_bottles</code></td><td>H2</td><td class="n">400</td><td class="n">10/10</td><td class="n">10/10</td><td class="n">9/10</td><td class="n">9/10</td></tr>
+<tr class="hl"><td><code>stack_blocks_three</code></td><td>H3</td><td class="n">1,200</td><td class="n">10/10</td><td class="n"><strong>6/10</strong></td><td class="n"><strong>10/10</strong></td><td class="n">8/10</td></tr>
+<tr><td><strong>Mean</strong></td><td></td><td></td><td class="n"><strong>100.0%</strong></td><td class="n"><strong>86.7%</strong></td><td class="n"><strong>96.7%</strong></td><td class="n"><strong>90.0%</strong></td></tr>
+</tbody></table></div>
+
+<h4>For reference · numbers published by the Flash-WAM authors (not ours)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Method (RoboTwin 2.0, 50 tasks)</th><th class="n">N<sub>v</sub>/N<sub>a</sub></th><th class="n">Avg Clean</th><th class="n">Avg Rand</th></tr></thead>
+<tbody>
+<tr><td>LingBot-VA (teacher)</td><td class="n">25/50</td><td class="n">92.93</td><td class="n">91.55</td></tr>
+<tr><td>Video-only LCM</td><td class="n">1/2</td><td class="n">80.66</td><td class="n">76.92</td></tr>
+<tr><td>Video-only LCM + reg.</td><td class="n">1/2</td><td class="n">86.92</td><td class="n">82.02</td></tr>
+<tr><td>Naive joint LCM</td><td class="n">1/2</td><td class="n">25.88</td><td class="n">20.08</td></tr>
+<tr><td><strong>Flash-WAM</strong></td><td class="n">1/2</td><td class="n"><strong>88.42</strong></td><td class="n"><strong>82.66</strong></td></tr>
+<tr><td><strong>Flash-WAM</strong></td><td class="n">1/1</td><td class="n"><strong>82.56</strong></td><td class="n"><strong>80.26</strong></td></tr>
+</tbody>
+<caption>From the Flash-WAM README / arXiv 2606.05254. These ablation rows (naive joint LCM collapses; video-only variants trail) explain why the loss must be modality-aware. Each row would need a full retrain, so we did not reproduce them.</caption>
+</table></div>
+
+<h4>Claim-by-claim verdict</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Paper claim</th><th>Verdict</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>23.3× speed-up</td><td><span class="chip mid">◐ Partial</span></td><td>19.06× here; the difference comes from the hardware's guidance cost.</td></tr>
+<tr><td>Teacher-level accuracy at 1 video step</td><td><span class="chip ok">✓ Replicated (clean scenes)</span></td><td>96.7% vs teacher 100% (3 tasks × 10, 1v/2a); 82.1% vs 71.8% on 13 randomized tasks.</td></tr>
+<tr><td>Distillation beats naive step reduction</td><td><span class="chip ok">✓ Supported (long task only)</span></td><td>10/10 vs 6/10 on <code>stack_blocks_three</code>, Fisher p = 0.087; tied on the two short tasks.</td></tr>
+<tr><td>LIBERO 98.6 / 95.7 / 95.1</td><td><span class="chip mid">◐ Unverifiable</span></td><td>No LIBERO student was released. Our own LCM student reaches 94.0% on LIBERO-Long.</td></tr>
+<tr><td>LCM ablation rows</td><td><span class="chip mid">◐ Unverifiable</span></td><td>Each needs a full retrain.</td></tr>
+<tr><td>Real-world Unitree G1</td><td><span class="chip mid">◐ Not testable</span></td><td>We have no robot, and the deployment code is unreleased.</td></tr>
+</tbody></table></div>
+
+<h4>Additional checks</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>Is the released student really distilled?</td><td>Yes: 692 of 839 shared tensors differ from the teacher (0.106% mean relative change; some biases moved by up to 89%).</td></tr>
+<tr><td>All four distillation modes run? (smoke test, RoboTwin, 4 steps)</td><td>Yes. Final loss: <code>flashwam</code> 0.250, <code>joint</code> 0.237, <code>video</code> 0.208, <code>video_action_aware</code> 0.239. The shipped config runs out of memory on 2 GPUs (45.1 GB per card).</td></tr>
+<tr><td>Harder scenes: teacher vs Flash-WAM 1v/2a on the 13 tasks both screened (<code>demo_randomized</code>, same seeds, 6 trials each)</td><td>Teacher <strong>64/78 (82.1%)</strong> vs Flash-WAM <strong>56/78 (71.8%)</strong>. The biggest drops are <code>handover_block</code> (6/6 → 2/6) and <code>put_bottles_dustbin</code> (3/6 → 1/6). The −10-point gap is in line with the paper's ~9-point randomized deficit.</td></tr>
+<tr><td>End-to-end wall clock</td><td>About 40 min per 10 trials is simulator overhead whatever the step count (77 passes ≈ 2.5 h vs 17 passes ≈ 1.1 h per 10 trials), so even an infinitely fast model gives at most ~3.5× end-to-end in simulation. Flash-WAM gives ~3×.</td></tr>
+</tbody></table></div>
+
+<div class="verdict ok"><p><span class="vt">Supports the hypothesis.</span> RQ1: the speed-up is real (19× at 1v/1a, 15.7× at the 1v/2a setting used for evaluation), and its exact size depends on hardware. RQ2: the student keeps almost all of the teacher's skill on clean scenes (96.7% vs 100% at 1v/2a; 90% at 1v/1a), though it trails by ~10 points on randomized scenes. RQ3: distillation earns its keep only on the long-horizon task. There the untrained teacher at the same 1v/2a budget falls to 6/10 while Flash-WAM holds 10/10. With 10 trials that is suggestive (p = 0.087), not proven.</p></div>
+</section>
+
+<!-- ============================ A2 ============================ -->
+<section class="study" id="s-mfd">
+<div class="study-head"><h3>A2 · MFD: swapping the distillation loss</h3><span class="chip no">✗ Refuted</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>Replacing Flash-WAM's LCM loss with Mean Flow Distillation (MFD), with everything else fixed, gives a student that is at least as fast and at least as successful.</p></div>
+  <div class="k">Research questions</div><div><ul>
+    <li><strong>RQ1</strong> Can MFD's three networks (teacher, student, auxiliary flow) fit on 4 × 48 GB?</li>
+    <li><strong>RQ2</strong> Does the MFD student keep the low-NFE inference speed?</li>
+    <li><strong>RQ3</strong> How does task success compare with LCM on RoboTwin and on LIBERO-Long?</li>
+    <li><strong>RQ4</strong> What does MFD cost to train?</li></ul></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li>Same teacher, same full-size student, same data, same 2,000 steps. <strong>Only the loss differs.</strong> The original MFD release makes the student a LoRA; we deliberately kept a full student so that the comparison isolates the loss.</li>
+    <li>The auxiliary flow model is a LoRA on the frozen teacher (rank 64, α 64, 300 linear layers, 161 M params) that can be switched on and off. With adapters off, the module reproduces the teacher bit for bit.</li>
+    <li>Evaluation at 1v/2a, no guidance: RoboTwin <code>demo_clean</code>, 3 tasks × 10 trials; LIBERO-Long (<code>libero_10</code>), 10 tasks × 10 episodes = 100 per model (failed episodes hit the 796-frame cap).</li></ul></div>
+  <div class="k">Setup</div><div><p>FSDP with activation checkpointing on 4 GPUs, bf16, batch 1 per GPU, AdamW. MFD settings: ODE step 0.02, so ceil((t − r)/0.02) Euler substeps, ≈17 on average and up to 50; teacher CFG 4.5 at every substep; 50:20 auxiliary:student cycle as published, r ≠ t ratio 1.0 (a true <em>mean</em> flow), action target in x₀ mode, aux LR 5e-6.</p></div>
+  <div class="k">Models &amp; data</div><div><p>Teacher: LingBot-VA RoboTwin and LIBERO checkpoints. Data: <code>robotwin-clean-and-aug-lerobot</code> (1,000 episodes downloaded) and the LIBERO-Long post-training set (500 episodes). Students: <code>libero_flashwam_full</code> (LCM), <code>libero_mfd_full</code> and <code>robotwin_mfd_full</code> (MFD).</p></div>
+</div>
+
+<h4>Training runs</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Run</th><th>Benchmark</th><th>Loss</th><th class="n">Steps</th><th class="n">Epochs</th><th class="n">Wall time</th><th class="n">GPU-h</th><th class="n">s / step</th></tr></thead>
+<tbody>
+<tr><td><code>libero_lcm_5ep</code></td><td>LIBERO</td><td>LCM</td><td class="n">63</td><td class="n">5.0</td><td class="n">1:56:44</td><td class="n">7.8</td><td class="n">111.2</td></tr>
+<tr><td><code>libero_flashwam_full</code></td><td>LIBERO</td><td>LCM</td><td class="n">2,000</td><td class="n">16.0</td><td class="n">9:39:33</td><td class="n">38.6</td><td class="n">17.4</td></tr>
+<tr><td><code>libero_mfd_full</code></td><td>LIBERO</td><td>MFD</td><td class="n">2,000</td><td class="n">16.0</td><td class="n">32:37:37</td><td class="n">130.5</td><td class="n">58.7</td></tr>
+<tr><td><code>robotwin_mfd_full</code> (aborted)</td><td>RoboTwin</td><td>MFD</td><td class="n">130</td><td class="n">0.5</td><td class="n">15:11:24</td><td class="n">45.6</td><td class="n">420.7</td></tr>
+<tr><td><code>robotwin_mfd_full</code></td><td>RoboTwin</td><td>MFD</td><td class="n">2,000</td><td class="n">8.0</td><td class="n">31:41:48</td><td class="n">126.8</td><td class="n">57.1</td></tr>
+<tr><td colspan="6"><strong>Total</strong></td><td class="n"><strong>349.3</strong></td><td></td></tr>
+</tbody>
+<caption>The aborted run silently inherited a hard-coded gradient-accumulation of 8 (a 218-hour ETA) and was caught at 6%. MFD is 3.4× slower per step because every student update integrates the teacher's ODE with CFG (an auxiliary step takes ~10 s, a student step ~166 s); the 50:20 cycle makes 1,440 of the 2,000 steps cheap auxiliary steps and 560 student steps.</caption>
+</table></div>
+
+<h4>Memory: why the auxiliary model is a LoRA</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Configuration</th><th class="n">Weights + optimizer state</th><th class="n">Per GPU</th><th class="n">Measured peak</th></tr></thead>
+<tbody>
+<tr><td>LCM (3 full models, 1 optimizer)</td><td class="n">61.2 GB</td><td class="n">15.3 GB</td><td class="n">47.5 GB</td></tr>
+<tr><td>MFD, full-copy auxiliary (rejected)</td><td class="n">91.8 GB</td><td class="n">22.9 GB</td><td class="n">OOM at 46.1 GB</td></tr>
+<tr class="hl"><td><strong>MFD, LoRA auxiliary (used)</strong></td><td class="n">52.0 GB</td><td class="n">13.0 GB</td><td class="n"><strong>29 GB</strong></td></tr>
+</tbody></table></div>
+
+<h4>Results · RoboTwin (<code>demo_clean</code>, 10 trials per task)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Task</th><th class="n">MFD (ours)</th><th class="n">Flash-WAM (LCM)</th></tr></thead>
+<tbody>
+<tr><td><code>adjust_bottle</code></td><td class="n">10/10</td><td class="n">9/10</td></tr>
+<tr><td><code>pick_dual_bottles</code></td><td class="n">10/10</td><td class="n">10/10</td></tr>
+<tr><td><code>stack_blocks_three</code></td><td class="n">10/10</td><td class="n">10/10</td></tr>
+<tr><td><strong>Overall</strong></td><td class="n"><strong>30/30 (100%)</strong></td><td class="n"><strong>29/30 (96.7%)</strong></td></tr>
+</tbody><caption>Both at 1v/2a. The Flash-WAM column is a second run of exactly the A1 setting with the same start seed, yet its per-task split differs (9/10/10 here vs 10/9/10 in A1). That is evidence of run-to-run nondeterminism in the simulator/server stack. A one-trial difference is noise: a tie (Fisher p = 1.0).</caption></table></div>
+
+<h4>Results · LIBERO-Long (10 tasks × 10 episodes)</h4>
+<div class="chart"><div class="ct">LIBERO-Long successes per task (10 episodes each)</div><div class="cs">LCM 94/100 vs MFD 75/100. Hover a bar for its value.</div><div class="legend"><span class="sq" style="--c:var(--s1)">LCM (Flash-WAM recipe)</span><span class="sq" style="--c:var(--s2)">MFD (ours)</span></div><svg viewBox="0 0 640 300" role="img" aria-label="LIBERO-Long successes per task, LCM vs MFD">
+<line class="grid" x1="52" x2="624" y1="260.0" y2="260.0"/><text class="axis" x="44" y="264.0" text-anchor="end">0</text>
+<line class="grid" x1="52" x2="624" y1="210.8" y2="210.8"/><text class="axis" x="44" y="214.8" text-anchor="end">2</text>
+<line class="grid" x1="52" x2="624" y1="161.6" y2="161.6"/><text class="axis" x="44" y="165.6" text-anchor="end">4</text>
+<line class="grid" x1="52" x2="624" y1="112.4" y2="112.4"/><text class="axis" x="44" y="116.4" text-anchor="end">6</text>
+<line class="grid" x1="52" x2="624" y1="63.2" y2="63.2"/><text class="axis" x="44" y="67.2" text-anchor="end">8</text>
+<line class="grid" x1="52" x2="624" y1="14.0" y2="14.0"/><text class="axis" x="44" y="18.0" text-anchor="end">10</text>
+<path class="bar s1" d="M59.6,260.0 V42.6 Q59.6,38.6 63.6,38.6 H75.6 Q79.6,38.6 79.6,42.6 V260.0 Z"><title>Task 1, LCM: 9/10</title></path>
+<path class="bar s2" d="M81.6,260.0 V116.4 Q81.6,112.4 85.6,112.4 H97.6 Q101.6,112.4 101.6,116.4 V260.0 Z"><title>Task 1, MFD: 6/10</title></path>
+<text class="axis" x="80.6" y="278" text-anchor="middle">1</text>
+<path class="bar s1" d="M116.8,260.0 V18.0 Q116.8,14.0 120.8,14.0 H132.8 Q136.8,14.0 136.8,18.0 V260.0 Z"><title>Task 2, LCM: 10/10</title></path>
+<path class="bar s2" d="M138.8,260.0 V67.2 Q138.8,63.2 142.8,63.2 H154.8 Q158.8,63.2 158.8,67.2 V260.0 Z"><title>Task 2, MFD: 8/10</title></path>
+<text class="axis" x="137.8" y="278" text-anchor="middle">2</text>
+<path class="bar s1" d="M174.0,260.0 V18.0 Q174.0,14.0 178.0,14.0 H190.0 Q194.0,14.0 194.0,18.0 V260.0 Z"><title>Task 3, LCM: 10/10</title></path>
+<path class="bar s2" d="M196.0,260.0 V18.0 Q196.0,14.0 200.0,14.0 H212.0 Q216.0,14.0 216.0,18.0 V260.0 Z"><title>Task 3, MFD: 10/10</title></path>
+<text class="axis" x="195.0" y="278" text-anchor="middle">3</text>
+<path class="bar s1" d="M231.2,260.0 V18.0 Q231.2,14.0 235.2,14.0 H247.2 Q251.2,14.0 251.2,18.0 V260.0 Z"><title>Task 4, LCM: 10/10</title></path>
+<path class="bar s2" d="M253.2,260.0 V18.0 Q253.2,14.0 257.2,14.0 H269.2 Q273.2,14.0 273.2,18.0 V260.0 Z"><title>Task 4, MFD: 10/10</title></path>
+<text class="axis" x="252.2" y="278" text-anchor="middle">4</text>
+<path class="bar s1" d="M288.4,260.0 V18.0 Q288.4,14.0 292.4,14.0 H304.4 Q308.4,14.0 308.4,18.0 V260.0 Z"><title>Task 5, LCM: 10/10</title></path>
+<path class="bar s2" d="M310.4,260.0 V91.8 Q310.4,87.8 314.4,87.8 H326.4 Q330.4,87.8 330.4,91.8 V260.0 Z"><title>Task 5, MFD: 7/10</title></path>
+<text class="axis" x="309.4" y="278" text-anchor="middle">5</text>
+<path class="bar s1" d="M345.6,260.0 V18.0 Q345.6,14.0 349.6,14.0 H361.6 Q365.6,14.0 365.6,18.0 V260.0 Z"><title>Task 6, LCM: 10/10</title></path>
+<path class="bar s2" d="M367.6,260.0 V18.0 Q367.6,14.0 371.6,14.0 H383.6 Q387.6,14.0 387.6,18.0 V260.0 Z"><title>Task 6, MFD: 10/10</title></path>
+<text class="axis" x="366.6" y="278" text-anchor="middle">6</text>
+<path class="bar s1" d="M402.8,260.0 V67.2 Q402.8,63.2 406.8,63.2 H418.8 Q422.8,63.2 422.8,67.2 V260.0 Z"><title>Task 7, LCM: 8/10</title></path>
+<path class="bar s2" d="M424.8,260.0 V116.4 Q424.8,112.4 428.8,112.4 H440.8 Q444.8,112.4 444.8,116.4 V260.0 Z"><title>Task 7, MFD: 6/10</title></path>
+<text class="axis" x="423.8" y="278" text-anchor="middle">7</text>
+<path class="bar s1" d="M460.0,260.0 V42.6 Q460.0,38.6 464.0,38.6 H476.0 Q480.0,38.6 480.0,42.6 V260.0 Z"><title>Task 8, LCM: 9/10</title></path>
+<path class="bar s2" d="M482.0,260.0 V91.8 Q482.0,87.8 486.0,87.8 H498.0 Q502.0,87.8 502.0,91.8 V260.0 Z"><title>Task 8, MFD: 7/10</title></path>
+<text class="axis" x="481.0" y="278" text-anchor="middle">8</text>
+<path class="bar s1" d="M517.2,260.0 V42.6 Q517.2,38.6 521.2,38.6 H533.2 Q537.2,38.6 537.2,42.6 V260.0 Z"><title>Task 9, LCM: 9/10</title></path>
+<path class="bar s2" d="M539.2,260.0 V91.8 Q539.2,87.8 543.2,87.8 H555.2 Q559.2,87.8 559.2,91.8 V260.0 Z"><title>Task 9, MFD: 7/10</title></path>
+<text class="axis" x="538.2" y="278" text-anchor="middle">9</text>
+<path class="bar s1" d="M574.4,260.0 V42.6 Q574.4,38.6 578.4,38.6 H590.4 Q594.4,38.6 594.4,42.6 V260.0 Z"><title>Task 10, LCM: 9/10</title></path>
+<path class="bar s2" d="M596.4,260.0 V165.6 Q596.4,161.6 600.4,161.6 H612.4 Q616.4,161.6 616.4,165.6 V260.0 Z"><title>Task 10, MFD: 4/10</title></path>
+<text class="axis" x="595.4" y="278" text-anchor="middle">10</text>
+<text class="axis" x="338.0" y="296" text-anchor="middle">LIBERO-Long task</text>
+<text class="axis" x="12" y="137.0" text-anchor="middle" transform="rotate(-90 12 137.0)">successes / 10</text>
+</svg>
+</div>
+<div class="table-wrap"><table>
+<thead><tr><th>Model</th><th class="n">Success</th><th>Per task (out of 10)</th></tr></thead>
+<tbody>
+<tr class="hl"><td><strong>Flash-WAM recipe (LCM), our student</strong></td><td class="n"><strong>94/100 = 94.0%</strong></td><td>9, 10, 10, 10, 10, 10, 8, 9, 9, 9</td></tr>
+<tr><td><strong>MFD (ours)</strong></td><td class="n"><strong>75/100 = 75.0%</strong></td><td>6, 8, 10, 10, 7, 10, 6, 7, 7, 4</td></tr>
+</tbody><caption>Tasks 1–10: (1) alphabet soup + tomato sauce in basket; (2) cream cheese + butter in basket; (3) stove on + moka pot; (4) black bowl in bottom drawer; (5) two mugs on plates; (6) book in caddy; (7) mug on plate + pudding; (8) alphabet soup + cream cheese in basket; (9) both moka pots on stove; (10) mug in microwave. No LIBERO simulator evaluation of the teacher was run.</caption></table></div>
+
+<h4>Summary</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Check</th><th class="n">LCM</th><th class="n">MFD</th></tr></thead>
+<tbody>
+<tr><td>LIBERO-Long success</td><td class="n"><strong>94.0%</strong></td><td class="n">75.0%</td></tr>
+<tr><td>RoboTwin success (3 × 10)</td><td class="n">29/30</td><td class="n">30/30</td></tr>
+<tr><td>Inference time per chunk, 1v/1a (speed-up)</td><td class="n">593.5 ms (19.1×)</td><td class="n">543.3 ms (20.8×)</td></tr>
+<tr><td>Inference time per chunk, 1v/2a (evaluated setting)</td><td class="n">722.2 ms (15.7×)</td><td class="n">699.0 ms (16.2×)</td></tr>
+<tr><td>LIBERO eval wall time, 100 episodes</td><td class="n">9 h 17 m</td><td class="n">11 h 00 m</td></tr>
+<tr><td>Training time per step</td><td class="n">17.4 s</td><td class="n">58.7 s (3.4×)</td></tr>
+<tr><td>Peak memory per GPU</td><td class="n">47.5 GB</td><td class="n">29 GB</td></tr>
+</tbody></table></div>
+
+<div class="verdict no"><p><span class="vt">Contradicts the hypothesis.</span> RQ1: MFD fits once the auxiliary model is a LoRA, and peak memory drops to 29 GB. RQ2: MFD keeps the speed (20.8×). RQ3: it ties on the small, saturated RoboTwin test but trails by <strong>19 points</strong> on LIBERO-Long (75% vs 94%, 200 episodes over 10 tasks). That is the more discriminating benchmark, so where the two disagree we trust LIBERO. RQ4: it costs 3.4× more to train. A newer loss did not give a better student here.</p></div>
+</section>
+
+<!-- ============================ A3 ============================ -->
+<section class="study" id="s-mfd-diag">
+<div class="study-head"><h3>A3 · Why is MFD worse? Two explanations tested</h3><span class="chip no">✗ Both ruled out</span></div>
+
+<p>MFD minimises <code>gap</code>, the RMS of <code>u<sub>q</sub> − u<sub>p</sub></code> (the teacher's mean flow minus the auxiliary model's estimate of the student's). It never shrank: it stayed flat at ~0.15 over 2,000 steps on LIBERO and drifted <em>up</em>, from 0.18 to 0.22, on RoboTwin. MFD trained without errors and produced a working policy, but it never closed the gap it exists to close.</p>
+
+<div class="facts">
+  <div class="k">Hypotheses</div><div><ul>
+    <li><strong>H-LR.</strong> The learning rate is too small. MFD student gradients had median norm 0.01, against 0.13 for LCM at the same LR.</li>
+    <li><strong>H-sample.</strong> MFD learns from the wrong samples. Our port fed the student real training latents noised to a random level (often almost clean) instead of what the student produces at inference, i.e. one step from pure noise.</li></ul></div>
+  <div class="k">Research question</div><div><p>Does fixing either one make <code>gap</code> fall and held-out error improve?</p></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li>One change per run, everything else as in A2: <code>config_libero</code>, 4 GPUs, the 50:20 cycle.</li>
+    <li>500 steps per run = 140 student updates. That matches the original run's step-500 checkpoint, which was already on disk.</li>
+    <li>Scored on 50 unseen LIBERO episodes with fixed noise and timesteps (one-step x̂₀ MSE at σ ≈ 1).</li>
+    <li>Sample fix: the student gets pure noise at the scheduler's first timestep (σ = 1) with the clean history stream untouched (<code>MFD_STUDENT_NOISE=inference</code>).</li></ul></div>
+  <div class="k">Setup &amp; data</div><div><p>LIBERO-Long teacher and data as in A2. One training run per condition, so there are no error bars.</p></div>
+</div>
+
+<h4>Results · held-out error (video MSE / action MSE)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Run</th><th class="n">Student LR</th><th class="n">Aux LR</th><th>Student sample</th><th class="n">Step 250</th><th class="n">Step 500</th></tr></thead>
+<tbody>
+<tr><td>Teacher (reference)</td><td class="n">—</td><td class="n">—</td><td>—</td><td class="n">0.0387 / 0.000785</td><td class="n"></td></tr>
+<tr><td>Flash-WAM (LCM)</td><td class="n">1e-5</td><td class="n">—</td><td>—</td><td class="n">0.0676 / 0.000680</td><td class="n">0.0832 / 0.000671</td></tr>
+<tr class="hl"><td>MFD original</td><td class="n">1e-5</td><td class="n">5e-6</td><td>training input</td><td class="n">0.0606 / 0.00144</td><td class="n">0.0738 / <strong>0.000993</strong></td></tr>
+<tr><td>MFD, LR × 3</td><td class="n">3e-5</td><td class="n">1.5e-5</td><td>training input</td><td class="n">0.1057 / 0.00256</td><td class="n">0.1790 / 0.01300</td></tr>
+<tr><td>MFD, LR × 10</td><td class="n">1e-4</td><td class="n">5e-5</td><td>training input</td><td class="n">1.958 / 1.769</td><td class="n">17.03 / 1.184 (collapsed)</td></tr>
+<tr><td>MFD, fixed sample</td><td class="n">1e-5</td><td class="n">5e-6</td><td>one step from pure noise</td><td class="n">0.0793 / 0.00180</td><td class="n">0.0660 / 0.00165</td></tr>
+</tbody></table></div>
+
+<h4>Results · <code>gap</code> over the first 500 steps</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Run</th><th class="n">Mean, first 20 student steps</th><th class="n">Mean, last 20</th><th class="n">Trend per 100 steps</th></tr></thead>
+<tbody>
+<tr><td>MFD original</td><td class="n">0.154</td><td class="n">0.160</td><td class="n">+0.0047</td></tr>
+<tr><td>MFD, LR × 3</td><td class="n">0.176</td><td class="n">0.340</td><td class="n">+0.0247</td></tr>
+<tr><td>MFD, LR × 10</td><td class="n">0.635</td><td class="n">1.062</td><td class="n">+0.0332</td></tr>
+<tr><td>MFD, fixed sample</td><td class="n">0.162</td><td class="n">0.168</td><td class="n">+0.0028</td></tr>
+</tbody></table></div>
+
+<div class="verdict no"><p><span class="vt">Both explanations contradicted.</span> <strong>H-LR:</strong> a higher LR makes everything worse, fast. At 3× LR, action error is 13× higher and <code>gap</code> rises 5× faster; at 10× training collapses. The small gradient norm is an artefact of the loss forms: LCM's Huber loss (c = 0.001) saturates to a unit per-element gradient, while MFD's surrogate gradient scales with <code>gap</code> (~0.15). Adam makes the scale largely irrelevant. <strong>H-sample:</strong> the fix makes the method match its definition and visibly changes training (the auxiliary loss rises from 0.020 to 0.030), but action error gets 67% worse and <code>gap</code> still rises. It is kept as an option, off by default.</p>
+<p>Still untested: the auxiliary:student turn ratio, and a full-copy auxiliary model (which does not fit in 4 × 48 GB). MFD underperforms LCM in this setting for reasons we have not found.</p></div>
+</section>
+
+<!-- ============================ A4 ============================ -->
+<section class="study" id="s-proxy">
+<div class="study-head"><h3>A4 · Does held-out reconstruction error predict which student is better?</h3><span class="chip mid">◐ Only action error does</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>A cheap held-out reconstruction score ranks distilled students the same way task success does, so it can stand in for expensive simulator evaluation.</p></div>
+  <div class="k">Research question</div><div><p>Which column, video MSE or action MSE, agrees with the LIBERO success ranking (LCM 94% &gt; MFD 75%)?</p></div>
+  <div class="k">Experimental design</div><div><p>One-step x̂₀ prediction at σ ≈ 1 on 50 LIBERO episodes never seen in training, with a fixed seed and identical noise and timesteps for every checkpoint. Scored every 250 steps through training.</p></div>
+  <div class="k">Models &amp; data</div><div><p>LIBERO teacher, our LCM student, our MFD student (A2).</p></div>
+</div>
+
+<h4>Results · final checkpoints</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Model</th><th class="n">Video MSE ↓</th><th class="n">Action MSE ↓</th><th class="n">LIBERO success</th></tr></thead>
+<tbody>
+<tr><td>Teacher</td><td class="n">0.0387</td><td class="n">0.000785</td><td class="n">—</td></tr>
+<tr><td>Flash-WAM recipe (LCM)</td><td class="n">0.1120</td><td class="n"><strong>0.000661</strong></td><td class="n"><strong>94%</strong></td></tr>
+<tr><td>MFD</td><td class="n"><strong>0.0656</strong></td><td class="n">0.001153</td><td class="n">75%</td></tr>
+</tbody></table></div>
+
+<h4>Results · across training</h4>
+<div class="table-wrap"><table>
+<thead><tr><th class="n">Step</th><th class="n">LCM video</th><th class="n">LCM action</th><th class="n">MFD video</th><th class="n">MFD action</th></tr></thead>
+<tbody>
+<tr><td class="n">250</td><td class="n">0.06757</td><td class="n">0.000680</td><td class="n">0.06059</td><td class="n">0.001437</td></tr>
+<tr><td class="n">500</td><td class="n">0.08318</td><td class="n">0.000671</td><td class="n">0.07383</td><td class="n">0.000993</td></tr>
+<tr><td class="n">750</td><td class="n">0.09275</td><td class="n">0.000664</td><td class="n">0.05902</td><td class="n">0.001131</td></tr>
+<tr><td class="n">1000</td><td class="n">0.09951</td><td class="n">0.000655</td><td class="n">0.06271</td><td class="n">0.001166</td></tr>
+<tr><td class="n">1250</td><td class="n">0.10117</td><td class="n">0.000692</td><td class="n">0.07214</td><td class="n">0.001417</td></tr>
+<tr><td class="n">1500</td><td class="n">0.10451</td><td class="n">0.000693</td><td class="n">0.06649</td><td class="n">0.001038</td></tr>
+<tr><td class="n">1750</td><td class="n">0.10736</td><td class="n">0.000695</td><td class="n">0.06951</td><td class="n">0.001193</td></tr>
+<tr class="hl"><td class="n">2000</td><td class="n">0.11197</td><td class="n">0.000661</td><td class="n">0.06560</td><td class="n">0.001153</td></tr>
+</tbody><caption>LCM's video MSE degrades 66% over the run (0.068 → 0.112) even as its training loss falls. MFD's stays roughly flat.</caption></table></div>
+
+<div class="verdict mid"><p><span class="vt">Mixed.</span> Video MSE <em>contradicts</em> the success ranking: it favours MFD by 41%, and on that basis you would pick the worse policy. Action MSE <em>agrees</em>: LCM is 43% better and even beats the teacher. A robot is judged by its movements, not by how sharply it pictures the future. Two caveats: both students reconstruct video far worse than the teacher, and this score structurally favours MFD, whose objective is closely related to it.</p></div>
+</section>
+
+<!-- ============================ A5 ============================ -->
+<section class="study" id="s-ladder">
+<div class="study-head"><h3>A5 · Does the teacher need all 77 passes?</h3><span class="chip no">✗ No: flat down to 17</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>The usual framing of distillation is "77 passes → 4". That framing assumes the teacher's success degrades steadily as its denoising budget is cut, so the baseline worth beating is 77.</p></div>
+  <div class="k">Research question</div><div><p>Where does the untrained teacher actually break as passes are removed?</p></div>
+  <div class="k">Experimental design</div><div><p>The hardest of the three A1 tasks, with everything fixed except the denoising steps: 77 → 57 → 37 → 17 → 5 passes (a ~15× compute range). 10 trials per setting, same start seed. The same rollouts also served as the decisive test in B1/B2.</p></div>
+  <div class="k">Models &amp; data</div><div><p>LingBot-VA RoboTwin teacher; <code>stack_blocks_three</code>, <code>demo_clean</code>, 1,200-step cap.</p></div>
+</div>
+
+<div class="table-wrap"><table>
+<thead><tr><th class="n">Forward passes</th><th class="n">77</th><th class="n">57</th><th class="n">37</th><th class="n">17</th><th class="n">5</th></tr></thead>
+<tbody><tr><td>N<sub>v</sub> / N<sub>a</sub></td><td class="n">25 / 50</td><td class="n">18 / 37</td><td class="n">12 / 23</td><td class="n">5 / 10</td><td class="n">1 / 2</td></tr>
+<tr><td>Success</td><td class="n">10/10</td><td class="n">10/10</td><td class="n">10/10</td><td class="n">10/10</td><td class="n"><strong>6/10</strong></td></tr></tbody></table></div>
+
+<div class="verdict no"><p><span class="vt">Contradicts the assumption.</span> The teacher is perfect down to 17 passes, so it can run ~4.5× faster with no training at all and lose nothing on this task. The real bar for a distillation method is therefore "beat 17 passes", not "beat 77". Everything that makes distillation worthwhile happens between 17 and 5. This rests on one task with 10 trials per setting; the flat stretch is the solid part.</p></div>
+</section>
+
+<h2 id="thread-b">Thread B · Knowing when a world action model is wrong</h2>
+<p>A WAM imagines the future before it acts, so a natural idea is to read failure off what it imagines. If that worked, we could generate several candidate plans and keep the best one (test-time scaling), or stop an attempt that is going wrong. We tried five signals in sequence, and each failure shaped the next attempt. Signals B1–B3 inspect only the model's own output. B4 compares the output with reality. B5–B6 try to predict B4 ahead of time.</p>
+
+<div class="callout">
+<p><strong>Two traps that shaped every analysis in this thread</strong></p>
+<p><strong>1. Episode length leaks the label.</strong> RoboTwin stops a rollout the moment it succeeds, so failures always run to the step cap. In the first 150 rollouts, every failure lasted exactly 1,216 steps and every success 448–800. Any whole-episode statistic therefore scores AUC 1.000 by leakage. From B3 on, every score uses the same opening prefix for every rollout of a task.</p>
+<p><strong>2. Pooling across tasks fakes correlations.</strong> Tasks sit at different levels of every score, so a line drawn through task clusters can look significant when nothing exists within any task (Simpson's paradox). All tests below rank <em>within</em> task.</p>
+</div>
+
+<!-- ============================ B1 ============================ -->
+<section class="study" id="s-d4rt">
+<div class="study-head"><h3>B1 · D4RT: is the imagined video geometrically self-consistent?</h3><span class="chip no">✗ Refuted</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>An imagined video that shows one coherent 3D scene comes from a rollout that is more likely to succeed. A label-free 3D tracking consistency score should therefore be lower (better) for successful rollouts, and should get worse as the denoising budget is cut.</p></div>
+  <div class="k">Research questions</div><div><ul>
+    <li><strong>RQ1</strong> Does cycle error correlate with task success?</li>
+    <li><strong>RQ2</strong> Does it track the denoising budget (77 → 5 passes)?</li>
+    <li><strong>RQ3</strong> Does it agree with the independent GeoBoN score (B2)?</li>
+    <li><strong>RQ4</strong> Over what tracking horizon does the tracker work on chunk-stitched generated video?</li></ul></div>
+  <div class="k">Score</div><div>
+<pre><code>p_k   = D4RT(p_0, t_src=0, t_tgt=k)      # track forward
+p_0'  = D4RT(p_k, t_src=k, t_tgt=0)      # track back
+err   = || p_0' - p_0 ||                 # round-trip distance, px
+cycle_px = mean over an 8x8 grid of query points and all k = 1..T-1</code></pre>
+<p>Lower is better. Any self-consistent tracker must return to its start, so no label is needed. Chance level: two uniform random points in a 256×256 frame are <strong>133.6 px</strong> apart.</p></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li>150 rollouts: teacher at 77 passes and at 1v/2a (<code>teacher_4</code>, really 5 passes), Flash-WAM (<code>lcm_4</code>) and our MFD (<code>mfd_4</code>), both at 1v/2a, on 3 tasks × 10 trials = 120; plus teacher at 57/37/17 passes on <code>stack_blocks_three</code> = 30.</li>
+    <li>Head-camera imagined clips decoded from the saved latents (256×256, consecutive 4–5-frame chunks concatenated) at 32- and 16-frame horizons.</li>
+    <li>Spearman correlations, logistic regression with a power analysis, Mann-Whitney rank tests, and a motion-energy confound check.</li>
+    <li>Re-tested on the balanced set from B3 (12 failures).</li></ul></div>
+  <div class="k">Setup &amp; models</div><div><p>OpenD4RT (open re-implementation of D4RT, ViT-g encoder, 1,160.5 M params) with a patched config. ~2.5 s encode + 0.28 s per 64 queries, 4.8 GiB peak on an A6000. Rollouts come from the LingBot-VA teacher, Flash-WAM and our MFD student on RoboTwin <code>demo_clean</code>.</p></div>
+</div>
+
+<h4>Results · per configuration (120 rollouts, 3 tasks)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Run</th><th class="n">Passes</th><th class="n">Success</th><th class="n">GeoBoN <code>e_depth</code> ↓</th><th class="n">D4RT <code>cycle_px</code> ↓</th></tr></thead>
+<tbody>
+<tr><td><code>teacher_77</code></td><td class="n">77</td><td class="n">30/30</td><td class="n">0.1003</td><td class="n">72.7</td></tr>
+<tr><td><code>teacher_4</code></td><td class="n">5</td><td class="n"><strong>26/30</strong></td><td class="n">0.0970</td><td class="n">65.1</td></tr>
+<tr><td><code>lcm_4</code> (Flash-WAM)</td><td class="n">5</td><td class="n">29/30</td><td class="n">0.0880</td><td class="n">67.5</td></tr>
+<tr><td><code>mfd_4</code> (ours)</td><td class="n">5</td><td class="n">30/30</td><td class="n">0.0730</td><td class="n">72.2</td></tr>
+</tbody><caption>The weakest configuration (<code>teacher_4</code>) has the <em>best</em> cycle score: the ordering runs backwards.</caption></table></div>
+
+<h4>Results · correlations (Spearman)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Score</th><th class="n">vs success, n = 120</th><th class="n">vs success, n = 150</th><th class="n">vs denoising steps, single task (n = 70)</th></tr></thead>
+<tbody>
+<tr><td>OpenD4RT <code>cycle_px</code> @32f</td><td class="n">ρ = −0.044, p = 0.63</td><td class="n">ρ = −0.010, p = 0.91</td><td class="n">ρ = +0.150, p = 0.22</td></tr>
+<tr><td>OpenD4RT <code>cycle_px</code> @16f</td><td class="n">—</td><td class="n">—</td><td class="n">ρ = −0.017, p = 0.89</td></tr>
+<tr><td>GeoBoN <code>e_depth</code></td><td class="n">ρ = +0.116, p = 0.21</td><td class="n">ρ = +0.077, p = 0.35</td><td class="n">ρ = +0.025, p = 0.84</td></tr>
+</tbody><caption>A working score would correlate negatively with both success and steps. Restricted to the teacher ladder alone (n = 50, no students), all three stay null: |ρ| ≤ 0.072, p ≥ 0.62.</caption></table></div>
+
+<h4>Results · the denoising-step ladder (<code>stack_blocks_three</code>, n = 70, nothing pooled)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Run</th><th class="n">Passes</th><th class="n">Success</th><th class="n"><code>e_depth</code></th><th class="n"><code>cycle_px</code> @32f</th><th class="n"><code>cycle_px</code> @16f</th></tr></thead>
+<tbody>
+<tr><td><code>teacher_77</code></td><td class="n">77</td><td class="n">10/10</td><td class="n">0.0379</td><td class="n">109.29</td><td class="n">33.01</td></tr>
+<tr><td><code>teacher_57</code></td><td class="n">57</td><td class="n">10/10</td><td class="n">0.0543</td><td class="n">107.77</td><td class="n">35.95</td></tr>
+<tr><td><code>teacher_37</code></td><td class="n">37</td><td class="n">10/10</td><td class="n">0.0339</td><td class="n">109.67</td><td class="n">34.23</td></tr>
+<tr><td><code>teacher_17</code></td><td class="n">17</td><td class="n">10/10</td><td class="n">0.0394</td><td class="n">109.27</td><td class="n">34.57</td></tr>
+<tr><td><code>lcm_4</code></td><td class="n">5</td><td class="n">10/10</td><td class="n">0.0560</td><td class="n">104.48</td><td class="n">33.39</td></tr>
+<tr><td><code>mfd_4</code></td><td class="n">5</td><td class="n">10/10</td><td class="n">0.0498</td><td class="n">106.90</td><td class="n">33.77</td></tr>
+<tr class="hl"><td><code>teacher_4</code></td><td class="n">5</td><td class="n"><strong>6/10</strong></td><td class="n">0.0478</td><td class="n">97.30</td><td class="n">35.23</td></tr>
+</tbody></table></div>
+
+<h4>Results · the horizon finding (identical clips)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th><code>stack_blocks_three</code>, horizon</th><th class="n">Per-rollout mean <code>cycle_px</code></th><th class="n">Per-point median error</th><th>Reading</th></tr></thead>
+<tbody>
+<tr><td>32 frames (~7 stitched chunks)</td><td class="n">97–110 px</td><td class="n">~105 px</td><td>Close to the 133.6 px chance level: the tracker fails outright</td></tr>
+<tr class="hl"><td><strong>16 frames</strong> (~3 chunks)</td><td class="n"><strong>33–36 px</strong></td><td class="n"><strong>10.4–13.9 px</strong></td><td>Genuine correspondences found</td></tr>
+</tbody><caption>Shorter tasks only yield 16–20-frame clips. At 32 frames their per-rollout means are lower (<code>adjust_bottle</code> 57–70 px, <code>pick_dual_bottles</code> 40–42 px), which is why <code>cycle_px</code> must never be pooled across tasks. The seams between independently generated chunks accumulate. With only 4 configurations the 16-frame ranking briefly looked "correct", but the full ladder destroys it (<code>teacher_57</code> scores worst).</caption></table></div>
+
+<h4>Results · logistic fit P(success) = σ(b₀ + b₁·score) and its power</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Subset</th><th>Score</th><th class="n">b₁</th><th class="n">p</th><th class="n">OR per 1 SD (95% CI)</th><th class="n">Rank-test AUC (p)</th></tr></thead>
+<tbody>
+<tr><td>All, n = 150, 5 failures</td><td><code>e_depth</code></td><td class="n">+13.520</td><td class="n">0.324</td><td class="n">2.57 (0.39–16.75)</td><td class="n">0.377 (0.362)</td></tr>
+<tr><td>All</td><td><code>cycle_px</code> 32f</td><td class="n">+0.0041</td><td class="n">0.775</td><td class="n">1.14 (0.46–2.80)</td><td class="n">0.516 (0.911)</td></tr>
+<tr><td><code>stack_blocks_three</code>, n = 70, 4 failures</td><td><code>e_depth</code></td><td class="n">−6.125</td><td class="n">0.663</td><td class="n">0.83 (0.36–1.91)</td><td class="n">0.617 (0.455)</td></tr>
+<tr><td><code>stack_blocks_three</code></td><td><code>cycle_px</code> 32f</td><td class="n">+0.0569</td><td class="n">0.039*</td><td class="n">2.27 (1.04–4.93)</td><td class="n">0.424 (0.634)</td></tr>
+</tbody><caption>*Driven by one rollout (cycle 44.8 px, where the next lowest is 75.4). Dropping it gives p = 0.669. It also points the wrong way and fails Bonferroni across 6 tests (0.0083). At 80% power this sample could only detect OR ≈ 3.6 per SD; a modest OR ≈ 1.5 would need ~60–80 failures.</caption></table></div>
+
+<h4>Three false alarms we caught</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Apparent result</th><th>What it actually was</th></tr></thead>
+<tbody>
+<tr><td><code>1/cycle_px</code> vs success: Pearson r = −0.446, p = 0.004</td><td>The same single outlier. 1/x is nonlinear and re-weights points under Pearson; Spearman gives p = 0.66. For any rank statistic, Spearman(1/x, y) = −Spearman(x, y) exactly.</td></tr>
+<tr><td>Logistic fit on <code>cycle_px</code>: p = 0.039</td><td>The same rollout. p = 0.669 without it; wrong sign; fails Bonferroni.</td></tr>
+<tr><td>GeoBoN vs D4RT pooled: ρ = −0.501, p &lt; 0.001</td><td>Three task clusters (Simpson's paradox). Within task, the signs disagree: +0.321, −0.125, −0.157.</td></tr>
+</tbody></table></div>
+
+<h4>Results · balanced re-test (B3's data, 16-frame horizon)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Task</th><th class="n">Success mean</th><th class="n">Failure mean</th><th class="n">AUC</th></tr></thead>
+<tbody>
+<tr><td><code>hanging_mug</code></td><td class="n">43.77</td><td class="n">50.82</td><td class="n">0.583</td></tr>
+<tr><td><code>place_dual_shoes</code></td><td class="n">15.42</td><td class="n">12.06</td><td class="n">0.333</td></tr>
+<tr><td><code>put_bottles_dustbin</code></td><td class="n">14.94</td><td class="n">19.11</td><td class="n">0.619</td></tr>
+<tr class="hl"><td><strong>Pooled (within-task ranks)</strong></td><td></td><td></td><td class="n"><strong>0.514, permutation p = 0.95</strong></td></tr>
+</tbody></table></div>
+
+<div class="verdict no"><p><span class="vt">Contradicts the hypothesis.</span> RQ1: no correlation with success in 150 rollouts, and none on balanced data (AUC 0.514). RQ2: no trend across a ~15× compute range on one task. RQ3: the two geometric scores do not agree within task. RQ4 is the one durable result: OpenD4RT only works on generated video at a short horizon (16 frames, not 32), because chunk seams accumulate. A motion-energy confound was ruled out (ρ = −0.016, p = 0.92), so the score is not secretly measuring stillness.</p></div>
+</section>
+
+<!-- ============================ B2 ============================ -->
+<section class="study" id="s-geobon">
+<div class="study-head"><h3>B2 · GeoBoN: do the imagined head and wrist views agree in 3D?</h3><span class="chip no">✗ Refuted</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>From GeoBoN (arXiv 2607.17454): if the imagined head-camera and wrist-camera views describe the same 3D scene, the plan is good. Best-of-N selection by cross-view depth agreement raises success; the paper reports LIBERO-Long 97.2% → 98.3% with 8 candidates.</p></div>
+  <div class="k">Research questions</div><div><ul>
+    <li><strong>RQ1 (validity)</strong> Can <code>e_depth</code> tell a matched head/wrist pair from a deliberately mismatched one (wrist view taken from a different rollout)? The paper never reports this check.</li>
+    <li><strong>RQ2</strong> Does it correlate with task success or with the denoising budget?</li></ul></div>
+  <div class="k">Score (Eq. 5)</div><div>
+<pre><code>e_depth = (1/|W|) · Σ_p | log( d_proj(p) / d_vggt(p) ) |
+  d_proj = wrist depth, unprojected to 3D and reprojected into the head view
+  d_vggt = the head view's own predicted depth at that pixel
+  W      = pixels with positive depth and confidence &gt; 0.5</code></pre>
+<p>The log ratio makes the score scale-free: a 20% depth error gives |log 1.2| = 0.182 at any scale. Both depth maps <em>and</em> the relative camera pose come from one joint VGGT-Ω pass over the (head, wrist) pair, so no calibration is needed.</p></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li>No code was released, so we rebuilt GeoBoN from the paper: the evaluator (Eq. 5), the action–future agreement gate (Eqs. 2–4), the baseline / fixed-N / gated selector, and an N-way sampler with KV-cache rollback.</li>
+    <li>A synthetic self-check recovers <code>e_depth</code> = 3·10⁻⁸ on consistent geometry and 0.182 under a 20% depth error. The gate uses Farneback flow vs projected end-effector motion (τ<sub>gate</sub> = −0.2, ρ = 30 px, δ<sub>idle</sub> = 1 cm).</li>
+    <li>Discriminative-validity harness, run on LIBERO and RoboTwin before trusting the score: matched (head, wrist) pairs vs a time-shifted wrist frame vs a wrist frame from a different rollout.</li>
+    <li>Then scored the same 150 rollouts as B1.</li></ul></div>
+  <div class="k">Models &amp; data</div><div><p>VGGT-Ω (frozen). Imagined videos from LingBot-VA and its students on LIBERO-Long (128×128) and RoboTwin (head 256×320, wrists 128×160).</p></div>
+</div>
+
+<h4>Worked example (one pixel, <code>teacher_77</code> trial 5, <code>stack_blocks_three</code>)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Quantity</th><th class="n">Value</th><th>What happened</th></tr></thead>
+<tbody>
+<tr><td>Wrist depth at the centre pixel</td><td class="n">0.9716 m</td><td>Read from the wrist depth map</td></tr>
+<tr><td>Point in the head frame</td><td class="n">(−0.133, −0.219, 0.996)</td><td>Unprojected, then moved by the estimated relative pose (|t| = 0.185 m, 7.0°)</td></tr>
+<tr><td><code>d_proj</code> → lands at head pixel (164.3, 29.1)</td><td class="n">0.9959 m</td><td>Depth of that point as seen by the head camera</td></tr>
+<tr><td><code>d_vggt</code></td><td class="n">0.9716 m</td><td>The head camera's own depth at that pixel</td></tr>
+<tr><td>|log(d_proj / d_vggt)|</td><td class="n">0.0247</td><td>~2.5% disagreement for this pixel</td></tr>
+</tbody></table></div>
+
+<h4>Results · discriminative validity (mean <code>e_depth</code>)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Benchmark</th><th class="n">Matched pair</th><th class="n">Time-shifted wrist</th><th class="n">Wrist from another rollout</th><th class="n">AUC matched vs shifted</th><th class="n">AUC matched vs mismatched</th></tr></thead>
+<tbody>
+<tr><td>LIBERO</td><td class="n">0.0438</td><td class="n">0.0442</td><td class="n">0.0461</td><td class="n">0.521</td><td class="n">0.531</td></tr>
+<tr><td>RoboTwin</td><td class="n">0.0961</td><td class="n">0.1222</td><td class="n">0.0901</td><td class="n">0.562</td><td class="n">0.497</td></tr>
+</tbody><caption>On LIBERO (128×128) VGGT-Ω returns a degenerate pair: 100% valid pixels and a predicted 177° inter-view rotation. Cost: 3.0 s and 4.6 GiB per pair. Paper targets we could not reach: LingBot-VA on LIBERO-Long 97.2 → 98.3 (N = 8) and 99.1 (N = 16); Motus on RoboTwin 87.8 → 89.5.</caption></table></div>
+
+<h4>Results · summary</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Check</th><th class="n">Result</th></tr></thead>
+<tbody>
+<tr class="hl"><td>Validity: matched vs mismatched views, LIBERO</td><td class="n">AUC <strong>0.531</strong> (chance)</td></tr>
+<tr class="hl"><td>Validity: matched vs mismatched views, RoboTwin</td><td class="n">AUC <strong>0.497</strong> (chance)</td></tr>
+<tr><td>Share of the wrist view that lands inside the head view (RoboTwin)</td><td class="n">37%; 17% of pairs unscorable</td></tr>
+<tr><td>vs success, 150 rollouts</td><td class="n">ρ = +0.077, p = 0.35</td></tr>
+<tr><td>vs denoising steps, single task</td><td class="n">ρ = +0.025, p = 0.84</td></tr>
+<tr><td>Best case (<code>stack_blocks_three</code>, correct direction)</td><td class="n">AUC 0.617, p = 0.455</td></tr>
+</tbody></table></div>
+
+<div class="verdict no"><p><span class="vt">Contradicts the hypothesis on our setup.</span> RQ1 fails first: the score cannot tell matched from mismatched views (AUC 0.50–0.53), so it cannot rank plans. The cameras share too little of the scene: LIBERO frames are 128×128, and on RoboTwin only ~37% of the wrist view lands in the head view. RQ2: no correlation with success or with compute. The full plan-selection loop was built but never run closed-loop, because the offline validity check showed no signal for it to use. The best-fit logistic model is a flat line at the base rate: predicted success moves only from 0.95 to 0.91 across the observed <code>e_depth</code> range.</p></div>
+</section>
+
+<!-- ============================ B3 ============================ -->
+<section class="study" id="s-chatter">
+<div class="study-head"><h3>B3 · Gripper chatter: do failing rollouts look hesitant?</h3><span class="chip no">✗ Not confirmed (pre-registered)</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>A failing rollout looks hesitant: the gripper reverses between opening and closing instead of committing to a grasp. A score from the planned actions alone flags failures, within task.</p></div>
+  <div class="k">Research questions</div><div><ul>
+    <li><strong>RQ1</strong> Which simple action features separate failures from successes on a prefix that cannot leak episode length?</li>
+    <li><strong>RQ2</strong> Does the best feature transfer to an unseen task?</li>
+    <li><strong>RQ3</strong> Does combining it with the video score (B1) help?</li>
+    <li><strong>RQ4 (confirmatory)</strong> Does it survive a pre-registered test on fresh rollouts?</li></ul></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li><strong>Fix the failure count first.</strong> B1/B2 had only 5 failures in 150. We screened 19 tasks (6 trials each) for ~50% teacher success and ran 10 trials on the five closest: 50 rollouts, 12 failures.</li>
+    <li>Seven action features, each computed on a prefix equal to the task's shortest episode, ranked within task.</li>
+    <li>Leave-one-rollout-out and leave-one-task-out, with feature selection nested in-fold; a prefix-length sweep.</li>
+    <li><strong>Pre-registration</strong> (committed 2026-09-25, before any confirmation data): 60 new trials on the 3 failure tasks × 20 with fresh seeds (RoboTwin start seed 20000 vs 10000), a frozen recipe, a one-sided within-task permutation test with 10,000 permutations. <strong>Confirmed iff AUC &gt; 0.5 and p &lt; 0.05.</strong></li></ul></div>
+  <div class="k">Models &amp; data</div><div><p>LingBot-VA teacher (77 passes, guidance 5), RoboTwin <code>demo_randomized</code>. Dual-arm actions: 7 joints + 1 gripper per arm. <code>grip_chatter</code> = gripper direction reversals per step, averaged over both grippers (action channels 28–29).</p></div>
+</div>
+
+<h4>Task screen (19 tasks, 6 trials each) and the 10-trial runs</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Task</th><th class="n">Screen</th><th class="n">Full run</th></tr></thead>
+<tbody>
+<tr><td><code>hanging_mug</code></td><td class="n">2/6</td><td class="n">4/10</td></tr>
+<tr><td><code>place_dual_shoes</code></td><td class="n">4/6</td><td class="n">7/10</td></tr>
+<tr><td><code>put_bottles_dustbin</code></td><td class="n">3/6</td><td class="n">7/10</td></tr>
+<tr><td><code>dump_bin_bigbin</code></td><td class="n">5/6</td><td class="n">10/10</td></tr>
+<tr><td><code>place_object_stand</code></td><td class="n">5/6</td><td class="n">10/10</td></tr>
+<tr><td colspan="3" class="small">Also 5/6: <code>scan_object</code>, <code>place_object_basket</code>, <code>stack_bowls_three</code>. 6/6: the 11 others (<code>handover_block</code>, <code>handover_mic</code>, <code>place_bread_skillet</code>, <code>place_burger_fries</code>, <code>place_cans_plasticbox</code>, <code>rotate_qrcode</code>, <code>stamp_seal</code>, <code>blocks_ranking_rgb</code>, <code>blocks_ranking_size</code>, <code>open_microwave</code>, <code>stack_bowls_two</code>).</td></tr>
+<tr><td><strong>Total (full runs)</strong></td><td></td><td class="n"><strong>38/50 (12 failures)</strong></td></tr>
+</tbody><caption>The teacher is stronger than its published 92.9% average suggests: only 3 of 19 tasks land near 50%.</caption></table></div>
+
+<h4>Results · discovery (30 rollouts in the 3 tasks with failures)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Feature</th><th>Measures</th><th class="n">AUC</th><th class="n">Mann-Whitney p</th><th class="n">Permutation p</th></tr></thead>
+<tbody>
+<tr class="hl"><td><strong><code>grip_chatter</code></strong></td><td>gripper direction reversals per step</td><td class="n"><strong>0.789</strong></td><td class="n">0.0084</td><td class="n"><strong>0.0056</strong></td></tr>
+<tr><td><code>jitter</code></td><td>acceleration energy relative to motion</td><td class="n">0.278</td><td class="n">0.043</td><td class="n">0.048</td></tr>
+<tr><td><code>path_len</code></td><td>total joint-space path</td><td class="n">0.694</td><td class="n">0.078</td><td class="n">0.067</td></tr>
+<tr><td><code>stall_frac</code></td><td>fraction of near-motionless steps</td><td class="n">0.685</td><td class="n">0.092</td><td class="n">0.087</td></tr>
+<tr><td><code>jerk_p99</code></td><td>99th-percentile acceleration</td><td class="n">0.606</td><td class="n">0.33</td><td class="n">—</td></tr>
+<tr><td><code>path_ineff</code></td><td>1 − net / total displacement</td><td class="n">0.569</td><td class="n">0.54</td><td class="n">—</td></tr>
+<tr><td><code>jerk</code></td><td>mean acceleration</td><td class="n">0.486</td><td class="n">0.92</td><td class="n">—</td></tr>
+</tbody><caption>Whole-episode versions of these features score AUC 1.000 through length leakage. These numbers use the length-safe prefix.</caption></table></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Model</th><th class="n">In-sample AUC</th><th class="n">Leave-one-rollout-out</th><th class="n">Leave-one-task-out</th></tr></thead>
+<tbody>
+<tr><td>S1: video score only (<code>cycle_px</code>)</td><td class="n">0.514</td><td class="n">—</td><td class="n">0.310</td></tr>
+<tr><td>S2: <code>grip_chatter</code></td><td class="n">0.789</td><td class="n">0.690</td><td class="n">0.500</td></tr>
+<tr><td>S2, feature chosen in-fold</td><td class="n">0.789</td><td class="n">0.690</td><td class="n">0.454</td></tr>
+<tr><td>S3: S1 + <code>grip_chatter</code>, chosen in-fold</td><td class="n">0.799</td><td class="n">0.648</td><td class="n">0.440 (p = 0.25)</td></tr>
+<tr><td>S3: <code>grip_chatter</code> + <code>jitter</code></td><td class="n">0.824</td><td class="n">0.731</td><td class="n">0.542</td></tr>
+<tr><td>S3: S1 + <code>grip_chatter</code> + <code>jitter</code></td><td class="n">0.833</td><td class="n">0.704</td><td class="n">0.537</td></tr>
+</tbody><caption>Adding the video score: likelihood-ratio χ² = 0.07, p = 0.79 (fitted weight +0.075 vs +1.330).</caption></table></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Prefix (1 chunk = 32 steps)</th><th class="n"><code>hanging_mug</code></th><th class="n"><code>place_dual_shoes</code></th><th class="n"><code>put_bottles_dustbin</code></th></tr></thead>
+<tbody>
+<tr><td>32 (one chunk)</td><td class="n">0.542</td><td class="n">0.381</td><td class="n">0.714</td></tr>
+<tr><td>64</td><td class="n">0.708</td><td class="n">0.452</td><td class="n">0.690</td></tr>
+<tr><td>128</td><td class="n">0.875</td><td class="n">0.381</td><td class="n">0.476</td></tr>
+<tr><td>224</td><td class="n">0.833</td><td class="n">0.476</td><td class="n">0.667</td></tr>
+<tr><td>Task's shortest episode</td><td class="n"><strong>1.000</strong></td><td class="n"><strong>0.476</strong></td><td class="n"><strong>0.952</strong></td></tr>
+</tbody></table></div>
+
+<h4>Results · pre-registered confirmation (60 fresh rollouts, 21 failures)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th></th><th class="n">Discovery</th><th class="n">Confirmation</th></tr></thead>
+<tbody>
+<tr><td>Failures (mug / shoes / bottles)</td><td class="n">6 / 3 / 3</td><td class="n">14 / 1 / 6</td></tr>
+<tr><td>Prefix (shortest episode, steps)</td><td class="n">320 / 224 / 544</td><td class="n">352 / 224 / 544</td></tr>
+<tr class="hl"><td><strong>Pooled within-task AUC</strong></td><td class="n"><strong>0.789</strong></td><td class="n"><strong>0.599</strong>, one-sided p = <strong>0.066</strong></td></tr>
+<tr><td><code>hanging_mug</code></td><td class="n">1.000</td><td class="n">0.500</td></tr>
+<tr><td><code>place_dual_shoes</code></td><td class="n">0.476</td><td class="n">0.684</td></tr>
+<tr><td><code>put_bottles_dustbin</code></td><td class="n">0.952</td><td class="n">0.786</td></tr>
+<tr><td>Single 32-step chunk, pooled</td><td class="n">0.537</td><td class="n">0.451</td></tr>
+</tbody><caption>Protocol deviation (logged before restart): attempt 1 was terminated externally at 3 of 60 trials. Its output was archived as invalid, and all tasks were rerun from scratch with the same seeds.</caption></table></div>
+
+<div class="verdict no"><p><span class="vt">Contradicts the hypothesis.</span> RQ1: <code>grip_chatter</code> looked strong in discovery (0.789). RQ2: it falls to chance on an unseen task (0.44–0.50). RQ3: the video score adds nothing. RQ4: on fresh data with the recipe frozen it is 0.599, p = 0.066, <strong>not confirmed</strong>. On the task with the most failures it went from 1.000 to exactly 0.500. Its edge over chance shrank from 0.29 to 0.10, the classic signature of a winner picked as the best of seven on the same data. Even where it holds, it is at chance on a single chunk, so it could only ever be a late monitor, never a plan selector.</p></div>
+</section>
+
+<!-- ============================ B4 ============================ -->
+<section class="study" id="s-gap">
+<div class="study-head"><h3>B4 · The imagined-vs-real latent gap</h3><span class="chip ok">✓ Confirmed (pre-registered)</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>A rollout fails when the world does not do what the model expected. Encode, with the model's own Wan2.2 VAE, (a) the video the model <em>imagined</em> for a chunk and (b) the <em>real</em> frames recorded after its actions ran from the same state. The gap between the two latents is larger in failed rollouts than in successful ones, within task.</p></div>
+  <div class="k">Research questions</div><div><ul>
+    <li><strong>RQ1</strong> Is the gap a valid measurement: comparable latents, aligned chunks, not a proxy for motion or length?</li>
+    <li><strong>RQ2</strong> Does it separate failures within task, on fresh data, under a pre-registered test?</li>
+    <li><strong>RQ3</strong> <em>When</em> in a rollout does it separate: early enough to select plans, or only to monitor?</li></ul></div>
+  <div class="k">Score</div><div>
+<pre><code>gap_k   = mean over latent values of (imagined_k − real_k)²     # per chunk k
+gap_mean = mean_k gap_k                                         # per rollout
+variants: wrist cameras only; gap ÷ real scene motion ("skill")</code></pre></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li>A one-line model-server patch (<code>VA_SAVE_REAL_LATENTS=1</code>) saves the real latents during each rollout.</li>
+    <li><strong>Discovery:</strong> 13 tasks × 6 rollouts (SEED 0), 21 failures. Seven variants were examined; only <code>gap_mean</code> had been defined before seeing data.</li>
+    <li><strong>Pre-registration</strong> (committed 2026-10-02): 5 tasks × 14 fresh rollouts (SEED 1, start seed 20000). Primary <code>gap_mean</code>, confirmed iff within-task AUC &gt; 0.5 and one-sided permutation p &lt; 0.05 (10,000 permutations). Secondary <code>wrist_mean</code> and <code>skill_mean</code> at p &lt; 0.025 (Bonferroni). The frozen analysis ran automatically once all 70 rollouts existed.</li>
+    <li>No task outside the training set exists (the checkpoint saw all 50 RoboTwin tasks), so low-success tasks are hard tasks <em>inside</em> it.</li></ul></div>
+  <div class="k">Models &amp; data</div><div><p>Public Flash-WAM RoboTwin checkpoint at 1 video / 2 action steps, no guidance (3–26 min per rollout). RoboTwin <code>demo_randomized</code>. Latent shape per chunk [48, 2, 24, 20].</p></div>
+</div>
+
+<h4>Results · measurement checks (RQ1)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>Are the two latents comparable?</td><td>Where both hold the same real frame (the start frame), they differ by exactly <strong>0.0</strong>.</td></tr>
+<tr><td>Does each imagined chunk match its <em>own</em> real chunk?</td><td>Gap to its own chunk <strong>0.212</strong> vs to the next chunk <strong>0.532</strong> (2.5×), so the gap measures prediction, not a fixed offset.</td></tr>
+<tr><td>Is it just scene motion?</td><td>No. Failures move <em>less</em> yet have a <em>bigger</em> gap, and gap ÷ motion separates them just as well.</td></tr>
+<tr><td>Is it episode length?</td><td>No. In successes the gap does not drift with time (ρ = 0.069, p = 0.16), and over a fixed opening stretch it still separates (AUC 0.748).</td></tr>
+</tbody></table></div>
+
+<h4>Results · discovery screen (13 tasks, 76 rollouts)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Score</th><th class="n">Within-task AUC (8 tasks with both outcomes)</th><th class="n">Permutation p</th><th class="n">On the 5 tasks later chosen</th></tr></thead>
+<tbody>
+<tr><td><code>gap_mean</code> (all cameras)</td><td class="n">0.720</td><td class="n">0.008</td><td class="n">0.846</td></tr>
+<tr><td><code>wrist_mean</code></td><td class="n">0.822</td><td class="n">&lt; 0.001</td><td class="n">0.98</td></tr>
+<tr><td><code>skill_mean</code> (gap ÷ motion)</td><td class="n">0.756</td><td class="n">0.001</td><td class="n">0.98</td></tr>
+</tbody></table></div>
+
+<h4>Results · pre-registered confirmation (70 fresh rollouts, 27 failures)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Score</th><th class="n">Fresh-data within-task AUC</th><th class="n">One-sided p</th><th>Pass mark</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr class="hl"><td><strong><code>gap_mean</code> (primary)</strong></td><td class="n"><strong>0.799</strong></td><td class="n"><strong>0.0001</strong></td><td>p &lt; 0.05</td><td><span class="chip ok">✓ confirmed</span></td></tr>
+<tr><td><code>wrist_mean</code></td><td class="n">0.748</td><td class="n">0.0002</td><td>p &lt; 0.025</td><td><span class="chip ok">✓ confirmed</span></td></tr>
+<tr><td><code>skill_mean</code></td><td class="n">0.778</td><td class="n">0.0001</td><td>p &lt; 0.025</td><td><span class="chip ok">✓ confirmed</span></td></tr>
+</tbody></table></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Task</th><th class="n">Screen</th><th class="n">Fresh run</th><th class="n"><code>gap_mean</code> AUC</th></tr></thead>
+<tbody>
+<tr><td><code>handover_block</code></td><td class="n">2/6</td><td class="n">9/14</td><td class="n">1.000</td></tr>
+<tr><td><code>stamp_seal</code></td><td class="n">6/6</td><td class="n">12/14</td><td class="n">0.917</td></tr>
+<tr><td><code>put_bottles_dustbin</code></td><td class="n">1/6</td><td class="n">6/14</td><td class="n">0.896</td></tr>
+<tr><td><code>hanging_mug</code></td><td class="n">2/6</td><td class="n">2/14</td><td class="n">0.792</td></tr>
+<tr><td><code>place_burger_fries</code></td><td class="n">6/6</td><td class="n">14/14</td><td class="n">— (never failed)</td></tr>
+</tbody><caption>Descriptive, as pre-registered. Fixed-prefix variant 0.748. Between-task pooled AUC 0.886, which is confounded by scene and carries no weight.</caption></table></div>
+
+<figure><img src="assets/fig/1_confirmation_by_task.png" alt="Per-task strip plots of the imagined-vs-real latent gap on the 70 fresh rollouts; failures sit higher in every task with both outcomes" loading="lazy"><figcaption>Fresh data, per task: failed rollouts (orange) sit above successes (blue) in every task that has both outcomes.</figcaption></figure>
+<figure><img src="assets/fig/2_gap_over_time.png" alt="Standardised gap over action chunks for successes and failures; the curves overlap for the first chunks and separate from around chunk 4 to 6" loading="lazy"><figcaption>The gap opens during the rollout. Successes and failures overlap for the first ~3 chunks and separate from about chunk 4–6.</figcaption></figure>
+
+<h4>What is being compared: imagined (top) vs real (bottom), same starting scene</h4>
+<p class="small muted">Side-by-side videos from the LingBot-VA teacher (77 passes) on RoboTwin <code>demo_randomized</code>. Each half shows head, left-wrist and right-wrist cameras. The imagined stream re-anchors on the real observation every chunk, which is why it jumps every few frames. Both pairs below start from the same scene and end in opposite outcomes.</p>
+<div class="vgrid">
+  <figure><video controls preload="metadata" muted playsinline src="assets/video/hanging_mug_scene1_success.mp4"></video><figcaption><code>hanging_mug</code>, scene 1: success</figcaption></figure>
+  <figure><video controls preload="metadata" muted playsinline src="assets/video/hanging_mug_scene1_failure.mp4"></video><figcaption><code>hanging_mug</code>, scene 1: failure</figcaption></figure>
+  <figure><video controls preload="metadata" muted playsinline src="assets/video/put_bottles_dustbin_scene1_success.mp4"></video><figcaption><code>put_bottles_dustbin</code>, scene 1: success</figcaption></figure>
+  <figure><video controls preload="metadata" muted playsinline src="assets/video/put_bottles_dustbin_scene1_failure.mp4"></video><figcaption><code>put_bottles_dustbin</code>, scene 1: failure (runs to the step cap)</figcaption></figure>
+</div>
+
+<div class="verdict ok"><p><span class="vt">Supports the hypothesis.</span> RQ1: the measurement is valid. The latents are identical where they share a frame, chunks are aligned, and the gap is not a motion or length proxy. RQ2: <strong>confirmed on fresh data under a test fixed in advance</strong>: AUC 0.80, p = 0.0001, holding in all 4 tasks with both outcomes. It shrank only slightly from discovery (0.85 → 0.80), unlike gripper chatter (0.79 → 0.60). RQ3: it separates from chunk ~4–6, not at the start, so it is a <strong>failure monitor</strong> (a trigger to stop, retry or ask for help), not a plan selector. It measures surprise, not intent: a confidently wrong plan the world obeys would show a small gap. Limits: one model, one benchmark, five in-training tasks, and some small cells (<code>hanging_mug</code> has 2 fresh successes).</p></div>
+</section>
+
+<!-- ============================ B5 ============================ -->
+<section class="study" id="s-pred">
+<div class="study-head"><h3>B5 · Predicting the gap before acting (Phases 1–2)</h3><span class="chip mid">◐ Partly</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>The B4 gap needs the real video, so it is only known after a chunk runs. A small network that sees only what is known <em>before</em> acting (the imagined latents and the planned actions) can predict it. That would enable choosing between candidate plans.</p></div>
+  <div class="k">Research questions</div><div><ul>
+    <li><strong>RQ1</strong> Does the predictor track the measured gap on tasks it never saw?</li>
+    <li><strong>RQ2</strong> Does adding the imagined frame-to-frame difference ("imagined vs imagined") help?</li>
+    <li><strong>RQ3</strong> Do its predictions flag failures, and better than a free, training-less signal?</li>
+    <li><strong>RQ4</strong> Does more data (13 → 50 tasks) help?</li></ul></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li>Target: log of the per-chunk gap (B4). A second variant targets gap ÷ real scene motion.</li>
+    <li>Phase 1: 2,485 chunks from 146 rollouts (13 tasks). Fixed 8/5 task split, plus leave-one-task-out (every chunk predicted by a model that never saw its task).</li>
+    <li>Phase 2: 37 new tasks × 6 rollouts = 222 rollouts (1,910 chunks), giving all 50 RoboTwin tasks: <strong>381 rollouts, 4,395 chunks</strong>. 5-fold cross-validation grouped by task.</li>
+    <li>Failure-flagging is scored as rollout-level within-task AUC on the whole rollout and on an "opening stretch" (the first N chunks, N = shortest rollout in the task), with 95% ranges from resampling rollouts.</li>
+    <li>Free yardstick: how little change the model imagines between its own two imagined frames. It needs no training and never looks at the real video.</li></ul></div>
+  <div class="k">Model</div><div><p>Latent branch: imagined frames 1 and 2 (96 ch; variant 2 adds their difference, 144 ch) → 3 conv layers → pool → 64. Action branch: 1-D conv over 32 action steps → pool → 64. Concat → MLP → 1. 163,265 params (v1) or 190,913 (v2). MSE on the standardised log target, AdamW 1e-3, weight decay 1e-2, dropout 0.2, early stopping on 15% of training rollouts, 3 seeds averaged, CPU only.</p></div>
+  <div class="k">Data</div><div><p>Flash-WAM rollouts on RoboTwin <code>demo_randomized</code> with saved imagined latents, real latents and actions.</p></div>
+</div>
+
+<h4>Results · Phase 1, leave-one-task-out (110 rollouts in tasks with both outcomes, 49 failures)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Score</th><th class="n">Chunk-level ρ with measured gap</th><th class="n">AUC, whole rollout</th><th class="n">AUC, opening stretch</th><th class="n">95% range (opening)</th></tr></thead>
+<tbody>
+<tr><td>Measured gap (the ceiling)</td><td class="n">—</td><td class="n">0.757</td><td class="n">0.701</td><td class="n">0.62–0.77</td></tr>
+<tr class="hl"><td><strong>Variant 1:</strong> imagined + actions</td><td class="n"><strong>0.647</strong></td><td class="n">0.736</td><td class="n">0.631</td><td class="n">0.55–0.72</td></tr>
+<tr><td><strong>Variant 2:</strong> + imagined-vs-imagined</td><td class="n">0.642</td><td class="n">0.720</td><td class="n">0.642</td><td class="n">0.55–0.73</td></tr>
+<tr><td>Free signal: little imagined change</td><td class="n">−0.102</td><td class="n">0.872</td><td class="n">0.729</td><td class="n">0.62–0.77</td></tr>
+</tbody></table></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Phase 1 fixed split (5 unseen tasks, 17 failures)</th><th class="n">ρ</th><th class="n">AUC whole</th><th class="n">AUC opening</th></tr></thead>
+<tbody>
+<tr><td>Measured gap</td><td class="n">—</td><td class="n">0.87</td><td class="n">0.88</td></tr>
+<tr><td>Variant 1</td><td class="n">0.638</td><td class="n">0.82</td><td class="n">0.67</td></tr>
+<tr><td>Variant 2</td><td class="n">0.629</td><td class="n">0.80</td><td class="n">0.66</td></tr>
+<tr><td>Free signal</td><td class="n">−0.19</td><td class="n">0.94</td><td class="n">0.74</td></tr>
+</tbody><caption>Per-task opening AUCs swing wildly with few failures per task (e.g. <code>scan_object</code> 0.12 for v1 vs 0.62 for v2). Use pooled figures. An earlier gap ÷ motion model told the same story: ρ = 0.60, opening AUC 0.68.</caption></table></div>
+
+<h4>Results · Phase 2, all 50 tasks</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Same 13 tasks as Phase 1</th><th class="n">Phase 1 model (13 tasks)</th><th class="n">Phase 2 model (50 tasks)</th></tr></thead>
+<tbody>
+<tr><td>Tracks the real gap, chunk by chunk (ρ)</td><td class="n">0.64</td><td class="n"><strong>0.67</strong></td></tr>
+<tr><td>Learned gap: whole rollout</td><td class="n">0.72</td><td class="n"><strong>0.77</strong></td></tr>
+<tr><td>Learned gap: opening</td><td class="n">0.64</td><td class="n">0.65</td></tr>
+<tr><td>Learned gap ÷ motion: whole / opening</td><td class="n">0.82 / 0.68</td><td class="n">0.82 / 0.67</td></tr>
+<tr><td>Free signal: whole / opening</td><td class="n">0.87 / 0.73</td><td class="n">0.87 / 0.73</td></tr>
+</tbody><caption>All 50 tasks (212 rollouts in tasks with both outcomes, 80 failures): learned gap 0.74 whole / 0.62 opening; learned gap ÷ motion 0.76 / 0.63; free signal 0.90 / 0.67; true gap 0.75 / 0.71. Flash-WAM success over the 37 new tasks: 191/222 (86%); 20 tasks at 6/6, and the lowest is <code>open_microwave</code> at 2/6.</caption></table></div>
+
+<div class="verdict mid"><p><span class="vt">Partly supports it.</span> RQ1: yes, the predictor tracks the measured gap on unseen tasks (ρ 0.65, rising to 0.67 with 50 tasks). RQ2: the imagined-vs-imagined input changes nothing measurable, so variant 1 is kept. RQ3: <strong>no</strong>, it flags failures no better than the free "little imagined change" signal. Over the opening stretch it scores 0.63–0.65 against the free signal's 0.73 and the true gap's 0.70, with overlapping ranges. The free signal was noticed after seeing results, so it needs its own fresh test. RQ4: more data helps prediction slightly. The predictor now matches the true gap it imitates (0.74 vs 0.75), so the ceiling is the gap signal itself, not the amount of data.</p></div>
+</section>
+
+<!-- ============================ B6 ============================ -->
+<section class="study" id="s-tts">
+<div class="study-head"><h3>B6 · Test-time scaling: best-of-N by predicted gap</h3><span class="chip run">● Running · every diversity gate failed</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>At every chunk, sample 4 candidate plans from the same state and execute the one with the lowest predicted imagined-vs-real gap (B5's frozen selector). This raises task success over plain single-candidate execution on tasks the selector never saw.</p></div>
+  <div class="k">Research questions</div><div><ul>
+    <li><strong>RQ1 (gate)</strong> Do candidates drawn from the same state differ enough for selection to matter? Measured as the within-moment share of variance of the learned score, which must be ≥ 0.10.</li>
+    <li><strong>RQ2 (primary)</strong> Does best-of-4 win more paired trials than baseline?</li></ul></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li><strong>Pre-registered 2026-10-09</strong>, before any rollout. Selector <code>selector_v1.pt</code> (3 seeds averaged), trained only on 8 training tasks. Test tasks it never saw: <code>hanging_mug</code>, <code>handover_block</code>, <code>place_dual_shoes</code>, <code>stack_bowls_three</code>, <code>scan_object</code>.</li>
+    <li>Conditions: <code>baseline</code> (1 candidate) · <code>learned</code> (lowest predicted gap of 4) · <code>learned_free</code> (lowest z(predicted log gap) − z(log imagined motion)). 5 tasks × 20 rollouts, SEED 2, paired by trial index.</li>
+    <li>All candidates of one moment start from an identical model state: predicted memory entries cleared and both streaming-VAE caches restored between candidates.</li>
+    <li>Pilot gate before the main run (candidate #0 always executed, all 4 scored). Primary test: one-sided exact McNemar on discordant pairs, p &lt; 0.025 per selector (Bonferroni for 2).</li>
+    <li>When a gate failed, each new option was registered as an <em>amendment</em> before any of its rollouts ran.</li></ul></div>
+  <div class="k">Models &amp; data</div><div><p>Flash-WAM 1v/2a (original and amendment 1), then the LingBot-VA teacher 25v/50a with guidance 5 (amendments 2–3). RoboTwin <code>demo_randomized</code>.</p></div>
+</div>
+
+<h4>Results · the diversity gate, four attempts</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Attempt (registered)</th><th>Sampler</th><th class="n">Moments scored</th><th class="n">Learned-score share (gate ≥ 0.10)</th><th class="n">Imagined latents share</th><th class="n">Actions share</th><th class="n">Candidate #0 success</th><th>Outcome</th></tr></thead>
+<tbody>
+<tr><td>Original (10-09)</td><td>Flash-WAM 1v/2a, new noise seed per candidate</td><td class="n">80</td><td class="n"><strong>0.015</strong></td><td class="n">0.011</td><td class="n">0.014</td><td class="n">3/5</td><td><span class="chip no">✗ FAIL</span></td></tr>
+<tr><td>Amendment 1, P1 (10-11)</td><td>Flash-WAM 2v/2a + consistency re-noising with fresh noise</td><td class="n">48</td><td class="n"><strong>0.008</strong></td><td class="n">—</td><td class="n">≤ 0.001</td><td class="n">5/5</td><td><span class="chip no">✗ FAIL</span></td></tr>
+<tr><td>Amendment 1, P2 (10-11)</td><td>Flash-WAM 2v/2a, deterministic (control)</td><td class="n">47</td><td class="n"><strong>0.027</strong></td><td class="n">—</td><td class="n">≤ 0.001</td><td class="n">5/5</td><td><span class="chip no">✗ FAIL</span></td></tr>
+<tr><td>Amendment 2 (10-12)</td><td>LingBot-VA teacher 25v/50a, CFG 5</td><td class="n">54</td><td class="n"><strong>0.078</strong></td><td class="n">0.038</td><td class="n">0.000</td><td class="n">6/6</td><td><span class="chip no">✗ FAIL</span></td></tr>
+<tr class="hl"><td>Amendment 3 (10-12)</td><td>Teacher main run, by explicit decision despite the failed gate</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td><span class="chip run">● Running</span></td></tr>
+</tbody><caption>All pilots ran on <code>handover_block</code>. The selector picks a candidate other than #0 in 73–86% of moments, so it is choosing, but between nearly identical options. An early look at the first 4 teacher moments gave 0.250 (a pass); the full 54 gave 0.078. Only the full set was used, as registered.</caption></table></div>
+
+<h4>Why the candidates barely differ</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Quantity</th><th class="n">Flash-WAM</th><th class="n">LingBot-VA teacher</th></tr></thead>
+<tbody>
+<tr><td>Mean squared difference between two candidates' imagined latents</td><td class="n">0.016 (0.03–0.04 with 2 steps)</td><td class="n">0.059</td></tr>
+<tr><td>vs a typical imagined-vs-real gap</td><td class="n">~0.21 (13× larger)</td><td class="n">~0.21 (~4× larger)</td></tr>
+<tr><td>Candidate-to-candidate action difference, relative to action magnitude</td><td class="n">≈ 0</td><td class="n">0.04% (0.00016 vs 0.37)</td></tr>
+<tr><td>Learned score SD: within a moment vs between moments</td><td class="n">—</td><td class="n">0.045 vs 0.33</td></tr>
+</tbody></table></div>
+
+<h4>Amendment 3 · main run (in progress)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Design</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Model</td><td>LingBot-VA RoboTwin teacher, 25v/50a, guidance 5, <code>demo_randomized</code></td></tr>
+<tr><td>Cells</td><td>5 test tasks × {<code>baseline</code>, <code>bon</code> = best-of-4 by <code>selector_v1.pt</code>} × 10 rollouts, SEED 2 (start seed 30000), paired by trial index</td></tr>
+<tr><td>Test</td><td>Pooled over 50 pairs: one-sided exact McNemar; confirmed iff best-of-4 wins more discordant pairs and p &lt; 0.05</td></tr>
+<tr><td>Status</td><td>Launched 12 Oct 2026, 21:28 IST, on 2 GPUs (~72 s per executed chunk in best-of-4 mode). Results will be added here when all 10 cells have 10 rollouts.</td></tr>
+</tbody></table></div>
+
+<div class="verdict run"><p><span class="vt">RQ1 contradicted; RQ2 pending.</span> In every sampler we tried, the candidates are far closer to each other than imagination is to reality. Predicted actions in particular are essentially identical across noise seeds, even for the undistilled 75-step teacher. Because the executed behaviour is set by the actions, best-of-N by this score has almost nothing to act on, and the registered expectation for the main run is "little change". Best-of-N needs a sampler whose <em>actions</em> genuinely vary, and none of the four did.</p></div>
+</section>
+
+<!-- ============================ Thread C ============================ -->
+<h2 id="thread-c">Thread C · ContactGWM: contact as the action interface</h2>
+<p><strong>Thesis.</strong> For an explicit, object-centric rigid-body world model, the trajectory of <em>3D contact points on the object surface</em> is a sufficient and embodiment-agnostic action interface. It should beat end-effector pose (locked to one embodiment) and the actor's own surface geometry (which carries embodiment detail that does not matter to the object).</p>
+<p><strong>Design rule.</strong> Contact can fail as a <em>representation</em> (contact kinematics underdetermine the dynamics) or as an <em>extraction</em> (noisy contacts from video). The two must not be confounded, so everything here runs in simulation with one geometric contact operator shared by every embodiment. The state is held fixed as object surface points, deliberately without Gaussian splatting: splatting concerns the <em>state</em> representation, while the thesis is about the <em>action</em> interface.</p>
+
+<!-- ============================ C1 ============================ -->
+<section class="study" id="s-cop">
+<div class="study-head"><h3>C1 · Does a purely geometric contact operator match the physics engine?</h3><span class="chip ok">✓ Supported</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>One embodiment-agnostic geometric operator (object surface points within δ of the actor surface) recovers the contacts the physics engine reports, for any actor shape.</p></div>
+  <div class="k">Research questions</div><div><ul>
+    <li><strong>RQ1</strong> Precision and recall against the PhysX oracle as a function of δ.</li>
+    <li><strong>RQ2</strong> Which simulator backend exposes per-point oracle contacts?</li>
+    <li><strong>RQ3</strong> Is the operator analytically correct?</li></ul></div>
+  <div class="k">Operator</div><div><p>For each object surface point within δ of the actor it emits (position, flow, normal, separation, tangential velocity, confidence). Channel ladder: <code>cf_min</code> 7 = (x, y, z, Δx, Δy, Δz, w); <code>cf_normal</code> 10 = + normal; <code>cf_sep</code> 11 = + signed separation; <code>cf_full</code> 14 = + tangential velocity. The flow Δ is the <strong>actor's</strong> displacement, never the object's: object flow is exactly what the world model predicts, so conditioning on it would leak the answer. Object flow is kept only as a leak upper bound, and it raises an error unless <code>allow_leak=True</code>.</p></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li>14 analytic tests on sphere-on-plane geometry with closed-form answers.</li>
+    <li>A CPU-vs-GPU probe of the SAPIEN contact APIs, each backend in its own process.</li>
+    <li>Oracle validation: 5 YCB objects (cracker box, soup can, mustard bottle, banana, power drill), a kinematic sphere pusher, 5,093 true-contact frames, δ ∈ {2, 5, 10} mm.</li></ul></div>
+  <div class="k">Setup</div><div><p>ManiSkill3 / SAPIEN 3.0.3, torch 2.5.1 + cu124, 4 × A6000. SE(3) helpers round-trip to 1e-7; the geodesic angle uses atan2 in float64, because the naive acos form has a 0.04° float32 noise floor.</p></div>
+</div>
+
+<h4>Results · operator vs PhysX oracle</h4>
+<div class="table-wrap"><table>
+<thead><tr><th class="n">δ</th><th class="n">Precision</th><th class="n">Recall</th><th class="n">F1</th><th class="n">Patch chamfer (mm)</th><th class="n">Normal error (°)</th></tr></thead>
+<tbody>
+<tr class="hl"><td class="n">2 mm</td><td class="n">0.912</td><td class="n">1.000</td><td class="n">0.954</td><td class="n">3.38</td><td class="n">4.49</td></tr>
+<tr><td class="n">5 mm</td><td class="n">0.883</td><td class="n">1.000</td><td class="n">0.938</td><td class="n">5.17</td><td class="n">4.88</td></tr>
+<tr><td class="n">10 mm</td><td class="n">0.849</td><td class="n">1.000</td><td class="n">0.918</td><td class="n">7.23</td><td class="n">6.76</td></tr>
+</tbody></table></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Simulator backend</th><th>What <code>get_contacts</code> gives</th></tr></thead>
+<tbody>
+<tr><td>CPU</td><td>Full manifolds: per-point position, normal, separation, impulse (the complete oracle)</td></tr>
+<tr><td>GPU</td><td>No <code>get_contacts</code>; only a net <code>(num_envs, 3)</code> force per body pair. Oracle logging needs a CPU replay pass.</td></tr>
+</tbody></table></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Driving a kinematic actor with…</th><th class="n">Oracle contact frames</th><th class="n">Object displacement</th></tr></thead>
+<tbody>
+<tr><td><code>Entity.set_pose</code></td><td class="n"><strong>0</strong></td><td class="n"><strong>0.0 mm</strong></td></tr>
+<tr><td><code>set_kinematic_target</code></td><td class="n">661</td><td class="n">132 mm</td></tr>
+</tbody><caption>The single most dangerous footgun found: with <code>set_pose</code> the actor passes straight through the object, every episode completes, and nothing moves.</caption></table></div>
+
+<div class="verdict ok"><p><span class="vt">Supports the hypothesis.</span> Recall is 1.000 at every δ: the operator never misses a contact the physics engine reports. Precision is bounded by a definitional gap, not by error. The operator detects <em>proximity</em> and the oracle detects <em>force</em>; the false positives have median separation +0.48 mm, and 45% fall within 5 frames of a real contact (the approach/retreat band). The <code>sep</code> channel carries exactly that distinction. All 14 analytic tests pass. <strong>Note on δ:</strong> 2 mm was chosen as the working default, but the training corpus for C2–C4 was built with the script default δ = 5 mm (precision 0.883, recall 1.000). A model-level δ sweep has not been run.</p></div>
+</section>
+
+<!-- ============================ C2 ============================ -->
+<section class="study" id="s-mve">
+<div class="study-head"><h3>C2 · Which action interface transfers to unseen embodiments?</h3><span class="chip ok">✓ Supported</span></div>
+
+<div class="facts">
+  <div class="k">Hypotheses</div><div><ul>
+    <li><strong>H1 (transfer)</strong> Conditioning on 3D contact gives lower prediction error on held-out embodiments than end-effector pose or the actor's surface geometry.</li>
+    <li><strong>H2 (sufficiency)</strong> Adding end-effector pose on top of contact buys nothing.</li>
+    <li><strong>H3 (normals)</strong> Surface normals help beyond the minimal contact flow.</li></ul></div>
+  <div class="k">Research questions</div><div><ul>
+    <li><strong>RQ1</strong> Train on one embodiment (E1): which interface transfers best to 4 unseen ones?</li>
+    <li><strong>RQ2</strong> Train on three (E2): which interface beats constant-velocity extrapolation on 2 held-out embodiments?</li></ul></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li>One shared backbone with identical capacity, schedule and state tokens for every mode. <strong>Only the action tokens differ.</strong></li>
+    <li>Two controls: <code>none</code> (no action input; a mode that cannot beat it contributes nothing) and constant-velocity extrapolation (momentum alone, with no model).</li>
+    <li>Metric: median position error of the composed 4-step prediction (cm) on <strong>action-critical chunks</strong>, where constant velocity misses by &gt; 2 mm (21–31% of chunks). Averaged over all chunks, the coasting majority drowns the signal.</li>
+    <li>3 seeds per cell; mean ± std across seeds.</li></ul></div>
+  <div class="k">Action interfaces</div><div><div class="table-wrap" style="margin:4px 0"><table>
+    <thead><tr><th>Mode</th><th>Action tokens</th><th class="n">Params</th></tr></thead><tbody>
+    <tr><td><code>none</code></td><td>1 zero token (control)</td><td class="n">1,902,960</td></tr>
+    <tr><td><code>ee_pose</code></td><td>4 tokens × 12: position relative to object, rot6d, per-step displacement</td><td class="n">1,905,072</td></tr>
+    <tr><td><code>actor_geom</code></td><td>64 actor surface points × 4 steps × 9 (position, normal, displacement): DexWM / MRO-GWM style</td><td class="n">1,904,496</td></tr>
+    <tr><td><code>cf_min</code></td><td>≤ 48 contacts × 4 steps × 7 (position, actor flow, confidence)</td><td class="n">1,904,112</td></tr>
+    <tr><td><code>cf_normal</code></td><td><code>cf_min</code> + object surface normal (10 ch)</td><td class="n">1,904,688</td></tr>
+    <tr><td><code>ee_cf</code></td><td><code>ee_pose</code> and <code>cf_normal</code> tokens in one stream</td><td class="n">1,905,072</td></tr>
+    </tbody></table></div></div>
+  <div class="k">Model</div><div><p><code>MVEWorldModel</code>: 2-layer MLP token encoders + type embedding; 4 pre-LN transformer blocks (d = 192, 6 heads); mean-pool over object tokens → MLP → per-step translation (3) + rotation (R − I, 9), zero-initialised to "no motion", SVD-orthogonalised at inference. Object state: 256 surface points × 9 (position, normal, displacement). AdamW 4.4e-4, OneCycle, batch 96, 6,000 steps, 311–1,513 s per run.</p></div>
+  <div class="k">Data</div><div><p>SAPIEN, 16 YCB objects; each episode is 48 steps at 10 Hz (sim 250 Hz) of one straight push at 5 cm/s, with 25% planned near-misses. Chunks: 2 observed steps → 4 predicted, stride 3. Contacts are extracted against the object frozen at its last observed pose (leak guard), ≤ 48 per step from 2,048 object points and 512 actor points. The five E1/E2 embodiments give 5,954 episodes and 83 k chunks.</p></div>
+</div>
+
+<h4>Results · E1: train on <code>stick</code>, test on 4 unseen embodiments (action-critical, median cm)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Mode</th><th class="n">stick (train)</th><th class="n">sphere</th><th class="n">panel</th><th class="n">gripper</th><th class="n">hand</th><th class="n">OOD mean</th><th class="n">Transfer gap</th></tr></thead>
+<tbody>
+<tr><td>constant velocity</td><td class="n">0.395</td><td class="n">0.406</td><td class="n">0.558</td><td class="n">0.532</td><td class="n">0.515</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td>zero motion</td><td class="n">1.291</td><td class="n">1.472</td><td class="n">1.613</td><td class="n">1.699</td><td class="n">1.777</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td><code>none</code> (control)</td><td class="n">0.429</td><td class="n">0.690</td><td class="n">0.788</td><td class="n">0.814</td><td class="n">0.806</td><td class="n">0.774 ± .003</td><td class="n">0.345</td></tr>
+<tr><td><code>ee_pose</code></td><td class="n">0.263</td><td class="n">0.602</td><td class="n">0.591</td><td class="n">0.696</td><td class="n">0.802</td><td class="n">0.673 ± .003</td><td class="n">0.410</td></tr>
+<tr><td><code>actor_geom</code></td><td class="n">0.248</td><td class="n">0.596</td><td class="n">0.610</td><td class="n">0.697</td><td class="n">0.762</td><td class="n">0.666 ± .018</td><td class="n">0.417</td></tr>
+<tr><td><code>cf_min</code></td><td class="n">0.251</td><td class="n">0.504</td><td class="n">0.443</td><td class="n">0.602</td><td class="n">0.598</td><td class="n">0.537 ± .011</td><td class="n">0.286</td></tr>
+<tr class="hl"><td><strong><code>cf_normal</code></strong></td><td class="n"><strong>0.202</strong></td><td class="n">0.511</td><td class="n">0.413</td><td class="n">0.600</td><td class="n">0.587</td><td class="n"><strong>0.528 ± .005</strong></td><td class="n">0.327</td></tr>
+<tr><td><code>ee_cf</code></td><td class="n">0.207</td><td class="n">0.509</td><td class="n">0.417</td><td class="n">0.605</td><td class="n">0.595</td><td class="n">0.531 ± .009</td><td class="n">0.325</td></tr>
+</tbody><caption>Lift over the no-action control on OOD: <code>ee_pose</code> +13.1%, <code>actor_geom</code> +14.0%, <code>cf_min</code> +30.7%, <code>cf_normal</code> +31.8%, <code>ee_cf</code> +31.4%.</caption></table></div>
+
+<h4>Results · E2: train on <code>stick + sphere + panel</code>, hold out <code>gripper + hand</code></h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Mode</th><th class="n">stick</th><th class="n">sphere</th><th class="n">panel</th><th class="n">gripper</th><th class="n">hand</th><th class="n">OOD mean</th><th>vs const-vel (0.524)</th></tr></thead>
+<tbody>
+<tr><td><code>none</code></td><td class="n">0.563</td><td class="n">0.621</td><td class="n">0.707</td><td class="n">0.747</td><td class="n">0.736</td><td class="n">0.741 ± .008</td><td>worse</td></tr>
+<tr><td><code>ee_pose</code></td><td class="n">0.433</td><td class="n">0.461</td><td class="n">0.464</td><td class="n">0.545</td><td class="n">0.626</td><td class="n">0.586 ± .003</td><td>worse</td></tr>
+<tr><td><code>actor_geom</code></td><td class="n">0.362</td><td class="n">0.385</td><td class="n">0.375</td><td class="n">0.554</td><td class="n">0.536</td><td class="n">0.545 ± .013</td><td>worse</td></tr>
+<tr><td><code>cf_min</code></td><td class="n">0.376</td><td class="n">0.404</td><td class="n">0.352</td><td class="n">0.509</td><td class="n">0.486</td><td class="n">0.498 ± .004</td><td><strong>beats</strong></td></tr>
+<tr class="hl"><td><strong><code>cf_normal</code></strong></td><td class="n">0.350</td><td class="n">0.382</td><td class="n">0.331</td><td class="n">0.484</td><td class="n">0.483</td><td class="n"><strong>0.484 ± .001</strong></td><td><strong>beats</strong></td></tr>
+<tr><td><code>ee_cf</code></td><td class="n">0.348</td><td class="n">0.385</td><td class="n">0.333</td><td class="n">0.494</td><td class="n">0.490</td><td class="n">0.492 ± .006</td><td><strong>beats</strong></td></tr>
+</tbody></table></div>
+
+<h4>The evaluation gap: momentum is a strong, unreported baseline</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Held-out <code>gripper + hand</code>, median cm</th><th class="n">Const-vel</th><th class="n"><code>none</code></th><th class="n"><code>ee_pose</code></th><th class="n"><code>actor_geom</code></th><th class="n"><code>cf_normal</code></th></tr></thead>
+<tbody>
+<tr><td>All chunks, N = 3</td><td class="n"><strong>0.008</strong></td><td class="n">0.088</td><td class="n">0.108</td><td class="n">0.132</td><td class="n">0.106</td></tr>
+<tr><td>Moving chunks, N = 3</td><td class="n"><strong>0.127</strong></td><td class="n">0.246</td><td class="n">0.246</td><td class="n">0.277</td><td class="n">0.246</td></tr>
+<tr><td>Action-critical chunks, N = 3</td><td class="n">0.524</td><td class="n">0.741</td><td class="n">0.586</td><td class="n">0.545</td><td class="n"><strong>0.484</strong></td></tr>
+</tbody><caption>On all chunks, the no-action control beats every action interface and constant velocity is ~10× better than any model. The action interface only matters on the action-critical minority (21–31% of chunks per embodiment). Constant velocity scores 0.23–0.56 cm on action-critical chunks, the same order as published headline numbers for push world models.</caption></table></div>
+
+<div class="verdict ok"><p><span class="vt">Supports H1 and H2; H3 weakly.</span> <strong>H1:</strong> contact conditioning is <strong>20.7% better OOD</strong> than the strongest baseline in E1 (0.528 vs 0.666 cm). Seed spread is ±0.005–0.018 against a 0.14 cm effect, and the transfer gap shrinks by 22–31%. In E2, <strong>only</strong> the contact interfaces generalise to unseen embodiments better than momentum extrapolation. <strong>H2:</strong> <code>ee_cf</code> ≈ <code>cf_normal</code> in both settings (0.531 vs 0.528; 0.492 vs 0.484), so contact is a sufficient statistic for the action here. The actor's own geometry is not just unnecessary; out of embodiment it hurts. <strong>H3:</strong> normals help a little (0.537 → 0.528; 0.498 → 0.484). Caveats: the 16 objects are shared between training and test, so "held-out" means held-out <em>embodiment</em> only. In-distribution columns are scored on training chunks. The dynamics are single straight pushes at one speed.</p></div>
+</section>
+
+<!-- ============================ C3 ============================ -->
+<section class="study" id="s-nearmiss">
+<div class="study-head"><h3>C3 · Can you tell from the action alone whether the object will move?</h3><span class="chip ok">✓ Supported (representation level)</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>Near-misses (an actor passing close to the object without touching it) are where EE-pose conditioning should be weakest, because whether the object moves depends on geometry the pose does not encode. Contact makes hit-vs-miss linearly decodable.</p></div>
+  <div class="k">Experimental design</div><div><p>From the action representation <em>alone</em> (no world model), linearly predict whether the object moves, on hard chunks where the actor is within 12 cm. 25% of episodes are planned near-misses.</p></div>
+</div>
+<div class="table-wrap"><table>
+<thead><tr><th>Embodiment</th><th class="n"><code>ee_pose</code> AUC</th><th class="n">Contact AUC</th></tr></thead>
+<tbody>
+<tr><td>stick</td><td class="n">0.531</td><td class="n"><strong>0.992</strong></td></tr>
+<tr><td>sphere</td><td class="n">0.537</td><td class="n"><strong>0.987</strong></td></tr>
+<tr><td>panel</td><td class="n">0.514</td><td class="n"><strong>0.998</strong></td></tr>
+<tr><td>gripper</td><td class="n">0.545</td><td class="n"><strong>0.993</strong></td></tr>
+<tr><td>hand</td><td class="n">0.550</td><td class="n"><strong>0.997</strong></td></tr>
+</tbody></table></div>
+<div class="verdict ok"><p><span class="vt">Supports the hypothesis, with a built-in caveat.</span> EE pose is at chance and contact is near-perfect. Contact is computed <em>from</em> object geometry, so this is partly true by construction, and the full model does see object state. The defensible claim is that contact makes hit-vs-miss <em>linearly decodable</em> instead of something the model must infer, and E1/E2 show models infer it imperfectly out of embodiment. A model-level near-miss test has not been run.</p></div>
+</section>
+
+<!-- ============================ C4 ============================ -->
+<section class="study" id="s-scaling">
+<div class="study-head"><h3>C4 · The kill switch: does contact's advantage vanish as embodiments scale?</h3><span class="chip mid">◐ Holds on action-critical chunks; decays elsewhere</span></div>
+
+<div class="facts">
+  <div class="k">Hypothesis (null to kill)</div><div><p>Contact's margin over actor geometry is an artefact of training on few embodiments. With more training diversity, actor-geometry conditioning learns to generalise, and the margin halves with each doubling of training embodiments. If so, the idea is not worth a paper.</p></div>
+  <div class="k">Research question</div><div><p>How does the paired margin (actor_geom − cf_normal) / actor_geom on a <em>fixed</em> held-out set change as N grows from 1 to 8?</p></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li>Five new embodiments built to span distinct contact-patch topologies, giving a pool of 10.</li>
+    <li>Nested training sets: {stick} ⊂ +sphere, panel ⊂ +roller ⊂ +fork, wedge ⊂ +probe, block (N = 1, 3, 4, 6, 8).</li>
+    <li>Held-out set fixed at {gripper, hand}. Total training steps fixed at 6,000, so the only variable is diversity (each embodiment gets 6,000 / N steps).</li>
+    <li>4 modes × 3 seeds per N, per-seed paired margins, paired t-tests. Action-critical chunks as the pre-specified bucket.</li></ul></div>
+  <div class="k">Embodiments</div><div><div class="table-wrap" style="margin:4px 0"><table>
+  <thead><tr><th>Actor</th><th>Geometry</th><th class="n">Chunks</th><th class="n">Action-critical</th><th class="n">Contacts / chunk</th></tr></thead><tbody>
+  <tr><td>stick</td><td>vertical capsule r 10 mm, line contact</td><td class="n">16,758</td><td class="n">31.5%</td><td class="n">92.5</td></tr>
+  <tr><td>sphere</td><td>4 cm ball</td><td class="n">16,646</td><td class="n">31.5%</td><td class="n">83.9</td></tr>
+  <tr><td>panel</td><td>flat 12×100×80 mm plate</td><td class="n">16,730</td><td class="n">21.0%</td><td class="n">100.9</td></tr>
+  <tr><td>gripper</td><td>closed parallel gripper (2 fingers + palm)</td><td class="n">16,604</td><td class="n">25.3%</td><td class="n">79.4</td></tr>
+  <tr><td>hand</td><td>rigid hand proxy (palm, 4 fingers, thumb)</td><td class="n">16,716</td><td class="n">24.1%</td><td class="n">85.8</td></tr>
+  <tr><td>roller</td><td>horizontal capsule across the push</td><td class="n">16,450</td><td class="n">31.6%</td><td class="n">124.1</td></tr>
+  <tr><td>fork</td><td>three vertical prongs, 3 patches</td><td class="n">16,716</td><td class="n">30.1%</td><td class="n">122.7</td></tr>
+  <tr><td>wedge</td><td>60 mm box tilted 30°, inclined face</td><td class="n">16,576</td><td class="n">28.3%</td><td class="n">102.7</td></tr>
+  <tr><td>probe</td><td>9 mm ball tip on a shaft, point contact</td><td class="n">16,660</td><td class="n">31.2%</td><td class="n">64.5</td></tr>
+  <tr><td>block</td><td>60 mm cube, broad face</td><td class="n">16,702</td><td class="n">26.1%</td><td class="n">114.8</td></tr>
+  </tbody><caption>11,897 episodes and 166,558 chunks in total; 72 training runs across C2 and C4. Contacts per chunk are summed over 4 steps at δ = 5 mm.</caption></table></div></div>
+</div>
+
+<div class="chart"><div class="ct">Held-out error vs number of training embodiments</div><div class="cs">Action-critical chunks, held-out gripper + hand, median position error (cm), mean of 3 seeds. Hover a point for its value.</div><div class="legend"><span style="--c:var(--s1)">cf_normal (3D contact)</span><span style="--c:var(--s2)">actor_geom (DexWM-style)</span><span style="--c:var(--s3)">ee_pose</span><span style="--c:var(--text-3)">constant velocity</span></div><svg viewBox="0 0 640 300" role="img" aria-label="Held-out position error versus number of training embodiments">
+<line class="grid" x1="52" x2="520" y1="260.0" y2="260.0"/><text class="axis" x="44" y="264.0" text-anchor="end">0.4</text>
+<line class="grid" x1="52" x2="520" y1="198.5" y2="198.5"/><text class="axis" x="44" y="202.5" text-anchor="end">0.5</text>
+<line class="grid" x1="52" x2="520" y1="137.0" y2="137.0"/><text class="axis" x="44" y="141.0" text-anchor="end">0.6</text>
+<line class="grid" x1="52" x2="520" y1="75.5" y2="75.5"/><text class="axis" x="44" y="79.5" text-anchor="end">0.7</text>
+<line class="grid" x1="52" x2="520" y1="14.0" y2="14.0"/><text class="axis" x="44" y="18.0" text-anchor="end">0.8</text>
+<text class="axis" x="52.0" y="278" text-anchor="middle">1</text>
+<text class="axis" x="185.7" y="278" text-anchor="middle">3</text>
+<text class="axis" x="252.6" y="278" text-anchor="middle">4</text>
+<text class="axis" x="386.3" y="278" text-anchor="middle">6</text>
+<text class="axis" x="520.0" y="278" text-anchor="middle">8</text>
+<text class="axis" x="286.0" y="296" text-anchor="middle">training embodiments (N)</text>
+<text class="axis" x="12" y="137.0" text-anchor="middle" transform="rotate(-90 12 137.0)">cm, lower is better</text>
+<line class="ref" x1="52" x2="520" y1="183.7" y2="183.7"/><text class="lbl" x="58" y="178.7">constant velocity 0.524</text>
+<path class="line s1" d="M52.0,140.7 L185.7,208.3 L252.6,212.6 L386.3,215.1 L520.0,220.0"/>
+<circle class="s1" cx="52.0" cy="140.7" r="4.5"><title>cf_normal (3D contact), N=1: 0.594 cm</title></circle>
+<circle class="s1" cx="185.7" cy="208.3" r="4.5"><title>cf_normal (3D contact), N=3: 0.484 cm</title></circle>
+<circle class="s1" cx="252.6" cy="212.6" r="4.5"><title>cf_normal (3D contact), N=4: 0.477 cm</title></circle>
+<circle class="s1" cx="386.3" cy="215.1" r="4.5"><title>cf_normal (3D contact), N=6: 0.473 cm</title></circle>
+<circle class="s1" cx="520.0" cy="220.0" r="4.5"><title>cf_normal (3D contact), N=8: 0.465 cm</title></circle>
+<text class="lbl" x="530.0" y="224.0">cf_normal 0.465</text>
+<path class="line s2" d="M52.0,57.7 L185.7,170.8 L252.6,177.6 L386.3,188.7 L520.0,187.4"/>
+<circle class="s2" cx="52.0" cy="57.7" r="4.5"><title>actor_geom (DexWM-style), N=1: 0.729 cm</title></circle>
+<circle class="s2" cx="185.7" cy="170.8" r="4.5"><title>actor_geom (DexWM-style), N=3: 0.545 cm</title></circle>
+<circle class="s2" cx="252.6" cy="177.6" r="4.5"><title>actor_geom (DexWM-style), N=4: 0.534 cm</title></circle>
+<circle class="s2" cx="386.3" cy="188.7" r="4.5"><title>actor_geom (DexWM-style), N=6: 0.516 cm</title></circle>
+<circle class="s2" cx="520.0" cy="187.4" r="4.5"><title>actor_geom (DexWM-style), N=8: 0.518 cm</title></circle>
+<text class="lbl" x="530.0" y="191.4">actor_geom 0.518</text>
+<path class="line s3" d="M52.0,45.4 L185.7,145.6 L252.6,148.1 L386.3,163.4 L520.0,164.7"/>
+<circle class="s3" cx="52.0" cy="45.4" r="4.5"><title>ee_pose, N=1: 0.749 cm</title></circle>
+<circle class="s3" cx="185.7" cy="145.6" r="4.5"><title>ee_pose, N=3: 0.586 cm</title></circle>
+<circle class="s3" cx="252.6" cy="148.1" r="4.5"><title>ee_pose, N=4: 0.582 cm</title></circle>
+<circle class="s3" cx="386.3" cy="163.4" r="4.5"><title>ee_pose, N=6: 0.557 cm</title></circle>
+<circle class="s3" cx="520.0" cy="164.7" r="4.5"><title>ee_pose, N=8: 0.555 cm</title></circle>
+<text class="lbl" x="530.0" y="168.7">ee_pose 0.555</text>
+</svg>
+</div>
+
+<h4>Results · pre-specified bucket (action-critical, held-out gripper + hand, median cm)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th class="n">N train</th><th class="n"><code>none</code></th><th class="n"><code>ee_pose</code></th><th class="n"><code>actor_geom</code></th><th class="n"><code>cf_normal</code></th><th class="n">Margin</th><th class="n">Paired t</th></tr></thead>
+<tbody>
+<tr><td class="n">1</td><td class="n">0.810 ± .005</td><td class="n">0.749 ± .003</td><td class="n">0.729 ± .018</td><td class="n">0.594 ± .007</td><td class="n">18.5% ± 1.8</td><td class="n">17.5</td></tr>
+<tr><td class="n">3</td><td class="n">0.741 ± .008</td><td class="n">0.586 ± .003</td><td class="n">0.545 ± .013</td><td class="n">0.484 ± .001</td><td class="n">11.1% ± 2.4</td><td class="n">8.0</td></tr>
+<tr><td class="n">4</td><td class="n">0.738 ± .005</td><td class="n">0.582 ± .006</td><td class="n">0.534 ± .005</td><td class="n">0.477 ± .005</td><td class="n">10.7% ± 2.1</td><td class="n">9.0</td></tr>
+<tr><td class="n">6</td><td class="n">0.743 ± .005</td><td class="n">0.557 ± .006</td><td class="n">0.516 ± .007</td><td class="n">0.473 ± .006</td><td class="n">8.2% ± 1.9</td><td class="n">7.6</td></tr>
+<tr class="hl"><td class="n">8</td><td class="n">0.745 ± .004</td><td class="n">0.555 ± .007</td><td class="n">0.518 ± .010</td><td class="n">0.465 ± .003</td><td class="n"><strong>10.2% ± 2.5</strong></td><td class="n">7.1</td></tr>
+</tbody><caption>Constant velocity: 0.524. Halving per doubling would predict 4.2% at N = 8; we observe 10.2%. <code>cf_normal</code> beats constant velocity at every N ≥ 3, and <code>actor_geom</code> also clears it from N = 6 (0.516, 0.518).</caption></table></div>
+
+<h4>Results · other views of the same 72 runs</h4>
+<div class="table-wrap"><table>
+<thead><tr><th class="n">N</th><th class="n">Rotation, action-critical (°): <code>actor_geom</code> → <code>cf_normal</code></th><th class="n">Mean (not median) position, action-critical: margin</th><th class="n">Moving chunks, median: <code>actor_geom</code> → <code>cf_normal</code> (margin)</th></tr></thead>
+<tbody>
+<tr><td class="n">1</td><td class="n">3.335 → 2.814 (15.6%)</td><td class="n">0.924 → 0.830 (10.2%)</td><td class="n">0.507 → 0.380 (25.0%)</td></tr>
+<tr><td class="n">3</td><td class="n">2.741 → 2.525 (7.9%)</td><td class="n">0.734 → 0.689 (6.1%)</td><td class="n">0.277 → 0.246 (11.0%)</td></tr>
+<tr><td class="n">4</td><td class="n">2.678 → 2.418 (9.7%)</td><td class="n">0.717 → 0.672 (6.3%)</td><td class="n">0.251 → 0.230 (8.4%)</td></tr>
+<tr><td class="n">6</td><td class="n">2.661 → 2.372 (10.9%)</td><td class="n">0.700 → 0.660 (5.7%)</td><td class="n">0.230 → 0.218 (5.1%)</td></tr>
+<tr><td class="n">8</td><td class="n">2.650 → 2.339 (11.7%)</td><td class="n">0.702 → 0.658 (6.3%)</td><td class="n">0.225 → 0.216 (<strong>4.2%</strong>)</td></tr>
+</tbody><caption>Rotation reference: constant velocity 3.113°, zero motion 6.370°. At N = 1, <code>ee_pose</code> (3.227°) and <code>actor_geom</code> are worse on rotation than both the no-action control (2.977°) and constant velocity. Moving-chunk reference: constant velocity 0.127 cm, below every model at every N.</caption></table></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Held out = every unseen actor</th><th class="n"><code>none</code></th><th class="n"><code>ee_pose</code></th><th class="n"><code>actor_geom</code></th><th class="n"><code>cf_normal</code></th><th class="n">Margin</th></tr></thead>
+<tbody>
+<tr><td>N = 4 (gripper, hand, fork, wedge, probe, block)</td><td class="n">0.691</td><td class="n">0.560</td><td class="n">0.512</td><td class="n">0.440</td><td class="n">14.1%</td></tr>
+<tr><td>N = 6 (gripper, hand, probe, block)</td><td class="n">0.699</td><td class="n">0.539</td><td class="n">0.491</td><td class="n">0.446</td><td class="n">9.2%</td></tr>
+</tbody><caption>Per actor at N = 4, <code>actor_geom</code> → <code>cf_normal</code>: fork 0.492 → 0.422, wedge 0.552 → 0.439, probe 0.455 → 0.411, block 0.504 → 0.412. On probe, <code>cf_normal</code> is still worse than constant velocity (0.401).</caption></table></div>
+
+<div class="verdict mid"><p><span class="vt">Mixed: the kill switch passes on the pre-specified metric but not on every view.</span> On action-critical chunks (median position) the halving hypothesis is refuted: the margin drops once, from single- to multi-embodiment training (18.5% → ~11%), then plateaus at 8–11% through N = 8 (10.2% observed vs 4.2% predicted, every paired t ≥ 7). Contact keeps improving in absolute terms (0.594 → 0.465 cm), so both interfaces benefit from scale and contact stays ahead. On rotation the margin even <em>grows</em> (7.9% → 11.7%). On broader buckets, however, it does decay: on moving chunks it falls 11.0% → 4.2%, almost exactly the halving prediction, and on mean error it settles near 6%. The defensible claim is therefore specific: <strong>contact's advantage persists with scale where the action actually determines the outcome</strong>, and shrinks elsewhere.</p></div>
+</section>
+
+<!-- ============================ C5 ============================ -->
+<section class="study" id="s-gonogo">
+<div class="study-head"><h3>C5 · Novelty check and the GO / NO-GO review</h3><span class="chip mid">◐ Conditional GO, reframed</span></div>
+<div class="facts">
+  <div class="k">Question</div><div><p>Is "3D contact as an embodiment-agnostic action interface" still an open claim, and is the project feasible on this hardware?</p></div>
+  <div class="k">Method</div><div><p>A literature sweep against the MVE results, plus measured compute and toolchain costs on the 4 × A6000 machine.</p></div>
+</div>
+<div class="table-wrap"><table>
+<thead><tr><th>Finding</th><th>Consequence</th></tr></thead>
+<tbody>
+<tr><td><strong>DexWM</strong> (arXiv 2511.01177) represents hands and grippers as 3D particles and actions as end-effector particle displacement fields, i.e. our <code>actor_geom</code> baseline. <strong>μ₀</strong> (arXiv 2606.13769) uses embodiment-agnostic 3D interaction traces.</td><td>The original headline claim is no longer open. DexWM becomes the primary baseline. The thesis is reframed as <em>sufficiency and harm</em>: the contact intersection is a sufficient statistic for the action, and the actor's own geometry actively hurts out of embodiment (C2, C4).</td></tr>
+<tr><td>Feasibility measured: 5,954 episodes generated in 56 s on 8 CPU workers; chunk building + contact extraction ~2 min per 16.7 k chunks; MVE training 313 s and 3–12 GB, so 3–4 runs fit per A6000. <code>pointops</code> built in 7 min and the 2DGS rasterizer in &lt; 2 min.</td><td>Compute is not the bottleneck. Every build risk the plan rated "high" was retired in Phase 0.</td></tr>
+<tr><td>Six silent bugs in about one day of simulator work (see <a href="#lessons">lessons</a>).</td><td>Reimplementation risk is real. The MVE was kept splat-free on purpose, and splatting is optional polish rather than a prerequisite.</td></tr>
+</tbody></table></div>
+<div class="verdict mid"><p><span class="vt">Conditional GO.</span> The science works and is reproducible across seeds. The kill switch passed on the pre-specified metric (C4), which discharged the viability condition. What remains is framing (DexWM as the baseline; the less-is-more sufficiency claim) and depth beyond the interface comparison.</p></div>
+</section>
+
+<!-- ============================ Wrap-up ============================ -->
+<h2 id="lessons">Lessons &amp; silent bugs</h2>
+<h3>What we would tell someone starting this work</h3>
+<ol>
+  <li><strong>Compare the model with reality, not just with itself.</strong> Every score that looked only at what the model imagined (B1–B3) failed. The one that compared imagination with what actually happened (B4) worked.</li>
+  <li><strong>Judge a robot by what it does.</strong> MFD pictured the future more sharply and performed worse (A4). Action error tracked task success; video error did not.</li>
+  <li><strong>Simulators leak labels through episode length.</strong> Failed rollouts run to the step cap. Score the same prefix for every rollout.</li>
+  <li><strong>Decide the test before you see the data.</strong> Gripper chatter (0.79 → 0.60) and the latent gap (0.85 → 0.80) looked equally strong in discovery. Only a pre-registered test told them apart.</li>
+  <li><strong>Find the cheap baseline first.</strong> The teacher at 17 passes (A5), constant-velocity extrapolation (C2) and "little imagined change" (B5) were all baselines nobody reported, and each one reframed a result.</li>
+  <li><strong>Label configurations by what actually ran.</strong> Several of our own logs called a 1v/2a run (5 passes) "4 passes". This page uses the true counts.</li>
+</ol>
+
+<h3>Bugs that fail silently (no crash, wrong numbers)</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Where</th><th>What happens</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>LingBot-VA / Flash-WAM checkpoints</td><td>RoboTwin checkpoints ship <code>attn_mode: "torch"</code>. Training under it drops the causal + window mask, giving fully bidirectional attention and a 2.52% output difference. LIBERO ships the opposite default, so there it is inference that breaks.</td><td>A symlinked checkpoint directory with a patched <code>config.json</code> per use.</td></tr>
+<tr><td>Distillation config</td><td><code>max_train_steps</code> and <code>gradient_accumulation_steps = 8</code> are hard-coded with no override. The first RoboTwin MFD run was 8× slower than intended and cost 45.6 GPU-hours.</td><td>Both are now overridable.</td></tr>
+<tr><td>OpenD4RT</td><td>The shipped config says <code>clip_frames: 48</code> for a 32-frame checkpoint. The repo's eval loads with <code>strict=False</code>, so all three time embeddings are silently random.</td><td><code>clip_frames: 32</code>, encoder pretrained-init disabled → 0 missing keys.</td></tr>
+<tr><td>Our eval runners</td><td>The RoboTwin loop retried forever behind a bare <code>except</code>, showing a misleading downstream error; our LIBERO runner printed "done" without checking the exit code. Eval-client flags placed before <code>--overrides</code> are ignored.</td><td>Both runners now fail loudly. Read the <em>first</em> traceback.</td></tr>
+<tr><td>Our analysis joins</td><td>RoboTwin occasionally repeats a language prompt, which is the only join key between success and latents. Two trials were merged in 3 of 4 runs. Separately, one of six copy-pasted latent decoders cropped to the head camera.</td><td>Pair chronologically; one shared decoder. Re-scoring reproduces every published value.</td></tr>
+<tr><td>Porting MFD</td><td>Per-rank (r, t) draws gave different ODE substep counts per GPU, so FSDP all-gathers deadlocked after a 600 s watchdog with no traceback. The first smoke test only ran auxiliary steps and proved nothing.</td><td>(r, t) seeded from (seed, step, cycle) with a self-check; force 1:1 alternation in smoke tests.</td></tr>
+<tr><td>SAPIEN kinematics</td><td><code>set_pose</code> on a kinematic body → zero contacts, and the actor passes through. Holding the target across a record interval turns a 5 cm/s push into a 1.25 m/s impact that the velocity filter drops.</td><td><code>set_kinematic_target</code>, advanced every substep; assert that objects move.</td></tr>
+<tr><td>SAPIEN geometry</td><td>Capsules are x-aligned, but clouds were sampled along z, so the training embodiment had 87% zero-contact chunks (14.3 → 92.5 contacts per chunk after the fix). Static-vs-kinematic pairs report no contacts.</td><td>Validate every actor cloud against its collision shape; keep one body dynamic.</td></tr>
+<tr><td>SAPIEN processes</td><td>A <code>sapien.Scene</code> per episode exhausts Vulkan contexts; <code>fork</code> multiprocessing deadlocks.</td><td>Reuse one scene per (model, actor); use <code>spawn</code>, one actor per process.</td></tr>
+</tbody><caption>Crashing defects also fixed along the way: a streaming-VAE leak of ~2.4 GB per chunk (48 GB card dead after 3 chunks); Flash-WAM's trimmed <code>wan_va</code> cannot run its own eval; RoboTwin's curobo install (pin curobo v0.7.8 + warp-lang 1.7.2); an undeclared <code>setuptools</code>; LIBERO missing <code>empty_emb.pt</code> (recovered from the md5-identical RoboTwin encoder); LIBERO needing <code>gym==0.25.2</code>.</caption></table></div>
+
+<h2 id="open">Open questions</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Question</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>Does best-of-4 with the teacher raise success? (B6)</td><td><span class="chip run">● Running</span> Expected to change little, given the gates.</td></tr>
+<tr><td>Is there a sampler whose <em>actions</em> genuinely vary, so that best-of-N can matter?</td><td>Untested. Four samplers so far all give near-identical actions.</td></tr>
+<tr><td>Does the free "little imagined change" signal hold on fresh data?</td><td>Found post hoc in B5. It needs its own pre-registered test.</td></tr>
+<tr><td>Does the latent gap generalise to other WAMs or genuinely unseen tasks? Can a running-average alarm catch failures early enough to retry?</td><td>Untested. Confirmed only for Flash-WAM on 5 in-training RoboTwin tasks.</td></tr>
+<tr><td>Why does MFD never close its <code>gap</code>?</td><td>Learning rate and sample construction ruled out (A3). Untested: the auxiliary:student turn ratio; a full-copy auxiliary model (needs &gt; 4 × 48 GB).</td></tr>
+<tr><td>Is the bottles-task chatter signal (0.79 on fresh data) real?</td><td>Not the registered question; it would need its own fresh test.</td></tr>
+<tr><td>ContactGWM ablations designed but not yet run</td><td><code>cf_sep</code> / <code>cf_full</code> channels (data already stored); a 2D-projected contact baseline ("why 3D"); contact density (1/4/16/64 points); a model-level δ sweep; contact noise and dropout robustness; multi-object scenes; richer interactions (speed changes, reversals, toppling); a model-level near-miss test; an object split held out from training.</td></tr>
+</tbody></table></div>
+
+<h2 id="credits">Credits &amp; provenance</h2>
+<ul class="small">
+  <li><strong>LingBot-VA</strong> (Robbyant; arXiv 2601.21998; Apache-2.0) and <strong>Flash-WAM</strong> (Akbari et al., 2026; arXiv 2606.05254; Flash-WAM code under CC BY-NC 4.0) are the work of their authors. This page reports our independent replication and follow-up studies. Numbers marked "published" are theirs.</li>
+  <li>Methods replicated or used: Mean Flow Distillation (arXiv 2606.11155), Gated GeoBoN (arXiv 2607.17454; no official code, our reimplementation), OpenD4RT, VGGT-Ω. Baselines discussed: DexWM (arXiv 2511.01177), μ₀ (arXiv 2606.13769).</li>
+  <li>Benchmarks and simulators: RoboTwin 2.0, LIBERO, ManiSkill3 / SAPIEN, YCB objects.</li>
+  <li>Compute: 4 × NVIDIA RTX A6000 (48 GB), driver 550, CUDA 12.4. Distillation training 349.3 GPU-hours; verification experiments ~33 GPU-hours plus the latent-gap, predictor and test-time-scaling runs.</li>
+</ul>
+
+<footer>
+  <p>Maintained by Kunal Tilaganji · Last updated 12 October 2026. Every number on this page comes from the project's result files and reports. Where a summary report and the raw results disagreed, the raw results were used and the discrepancy is noted.</p>
+</footer>
+</main>
+</div>
+</body>
+</html>
