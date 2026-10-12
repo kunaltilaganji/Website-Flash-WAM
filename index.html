@@ -104,6 +104,7 @@ figcaption{font-size:.82rem;color:var(--text-3);margin-top:6px}
 .chart{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:14px 14px 8px;margin:16px 0}
 .chart .ct{font-weight:600;font-size:.95rem}
 .chart .cs{font-size:.8rem;color:var(--text-3);margin-bottom:6px}
+.chart{overflow-x:auto}
 .chart svg{width:100%;height:auto;display:block;overflow:visible}
 .chart .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.8rem;color:var(--text-2);margin:4px 0 6px}
 .chart .legend span::before{content:"";display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle;background:var(--c)}
@@ -137,7 +138,9 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--border);font-
   .facts{grid-template-columns:minmax(0,1fr)}
   .facts>div:nth-last-child(2){border-bottom:1px solid var(--border)}
   .cards{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-  .vgrid{grid-template-columns:minmax(0,1fr)}
+  .vgrid,.vgrid[style]{grid-template-columns:minmax(0,1fr)!important}
+  .chart svg{min-width:540px}
+  .map th:nth-child(3),.map td:nth-child(3){display:none}
 }
 </style>
 </head>
@@ -172,7 +175,7 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--border);font-
     <li class="grp">Wrap-up</li>
     <li><a href="#lessons">Lessons &amp; silent bugs</a></li>
     <li><a href="#open">Open questions</a></li>
-    <li><a href="#credits">Credits</a></li>
+    <li><a href="#credits">Code, papers &amp; credits</a></li>
   </ol>
 </nav>
 <main>
@@ -571,6 +574,13 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--border);font-
 <thead><tr><th class="n">Forward passes</th><th class="n">77</th><th class="n">57</th><th class="n">37</th><th class="n">17</th><th class="n">5</th></tr></thead>
 <tbody><tr><td>N<sub>v</sub> / N<sub>a</sub></td><td class="n">25 / 50</td><td class="n">18 / 37</td><td class="n">12 / 23</td><td class="n">5 / 10</td><td class="n">1 / 2</td></tr>
 <tr><td>Success</td><td class="n">10/10</td><td class="n">10/10</td><td class="n">10/10</td><td class="n">10/10</td><td class="n"><strong>6/10</strong></td></tr></tbody></table></div>
+
+<p class="small muted">What the difference looks like on <code>stack_blocks_three</code> (simulator recordings): the teacher at the full 77 passes, the teacher cut to 5 passes succeeding, and the same 5-pass teacher failing (it runs to the 1,200-step cap). Only the top strip (the three real cameras) is meaningful: the black "Imagined Video Stream: coming soon" panel is a placeholder that LingBot-VA's recorder never fills.</p>
+<div class="vgrid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+  <figure><video controls preload="metadata" muted playsinline src="assets/video/stack_blocks_teacher77_success.mp4"></video><figcaption>Teacher, 77 passes: success</figcaption></figure>
+  <figure><video controls preload="metadata" muted playsinline src="assets/video/stack_blocks_teacher5pass_success.mp4"></video><figcaption>Teacher, 5 passes: success</figcaption></figure>
+  <figure><video controls preload="metadata" muted playsinline src="assets/video/stack_blocks_teacher5pass_fail.mp4"></video><figcaption>Teacher, 5 passes: failure</figcaption></figure>
+</div>
 
 <div class="verdict no"><p><span class="vt">Contradicts the assumption.</span> The teacher is perfect down to 17 passes, so it can run ~4.5× faster with no training at all and lose nothing on this task. The real bar for a distillation method is therefore "beat 17 passes", not "beat 77". Everything that makes distillation worthwhile happens between 17 and 5. This rests on one task with 10 trials per setting; the flat stretch is the solid part.</p></div>
 </section>
@@ -998,7 +1008,7 @@ variants: wrist cameras only; gap ÷ real scene motion ("skill")</code></pre></d
 <tr><td>Status</td><td>Launched 12 Oct 2026, 21:28 IST, on 2 GPUs (~72 s per executed chunk in best-of-4 mode). Results will be added here when all 10 cells have 10 rollouts.</td></tr>
 </tbody></table></div>
 
-<div class="verdict run"><p><span class="vt">RQ1 contradicted; RQ2 pending.</span> In every sampler we tried, the candidates are far closer to each other than imagination is to reality. Predicted actions in particular are essentially identical across noise seeds, even for the undistilled 75-step teacher. Because the executed behaviour is set by the actions, best-of-N by this score has almost nothing to act on, and the registered expectation for the main run is "little change". Best-of-N needs a sampler whose <em>actions</em> genuinely vary, and none of the four did.</p></div>
+<div class="verdict run"><p><span class="vt">RQ1 contradicted; RQ2 pending.</span> In every sampler we tried, the candidates are far closer to each other than imagination is to reality. Predicted actions in particular are essentially identical across noise seeds, even for the undistilled 25 + 50-step teacher. Because the executed behaviour is set by the actions, best-of-N by this score has almost nothing to act on, and the registered expectation for the main run is "little change". Best-of-N needs a sampler whose <em>actions</em> genuinely vary, and none of the four did.</p></div>
 </section>
 
 <!-- ============================ Thread C ============================ -->
@@ -1178,7 +1188,7 @@ variants: wrist cameras only; gap ÷ real scene motion ("skill")</code></pre></d
 <text class="axis" x="520.0" y="278" text-anchor="middle">8</text>
 <text class="axis" x="286.0" y="296" text-anchor="middle">training embodiments (N)</text>
 <text class="axis" x="12" y="137.0" text-anchor="middle" transform="rotate(-90 12 137.0)">cm, lower is better</text>
-<line class="ref" x1="52" x2="520" y1="183.7" y2="183.7"/><text class="lbl" x="58" y="178.7">constant velocity 0.524</text>
+<line class="ref" x1="52" x2="520" y1="183.7" y2="183.7"/>
 <path class="line s1" d="M52.0,140.7 L185.7,208.3 L252.6,212.6 L386.3,215.1 L520.0,220.0"/>
 <circle class="s1" cx="52.0" cy="140.7" r="4.5"><title>cf_normal (3D contact), N=1: 0.594 cm</title></circle>
 <circle class="s1" cx="185.7" cy="208.3" r="4.5"><title>cf_normal (3D contact), N=3: 0.484 cm</title></circle>
@@ -1232,7 +1242,7 @@ variants: wrist cameras only; gap ÷ real scene motion ("skill")</code></pre></d
 <tr><td>N = 6 (gripper, hand, probe, block)</td><td class="n">0.699</td><td class="n">0.539</td><td class="n">0.491</td><td class="n">0.446</td><td class="n">9.2%</td></tr>
 </tbody><caption>Per actor at N = 4, <code>actor_geom</code> → <code>cf_normal</code>: fork 0.492 → 0.422, wedge 0.552 → 0.439, probe 0.455 → 0.411, block 0.504 → 0.412. On probe, <code>cf_normal</code> is still worse than constant velocity (0.401).</caption></table></div>
 
-<div class="verdict mid"><p><span class="vt">Mixed: the kill switch passes on the pre-specified metric but not on every view.</span> On action-critical chunks (median position) the halving hypothesis is refuted: the margin drops once, from single- to multi-embodiment training (18.5% → ~11%), then plateaus at 8–11% through N = 8 (10.2% observed vs 4.2% predicted, every paired t ≥ 7). Contact keeps improving in absolute terms (0.594 → 0.465 cm), so both interfaces benefit from scale and contact stays ahead. On rotation the margin even <em>grows</em> (7.9% → 11.7%). On broader buckets, however, it does decay: on moving chunks it falls 11.0% → 4.2%, almost exactly the halving prediction, and on mean error it settles near 6%. The defensible claim is therefore specific: <strong>contact's advantage persists with scale where the action actually determines the outcome</strong>, and shrinks elsewhere.</p></div>
+<div class="verdict mid"><p><span class="vt">Mixed: the kill switch passes on the pre-specified metric but not on every view.</span> On action-critical chunks (median position) the halving hypothesis is refuted: the margin drops once, from single- to multi-embodiment training (18.5% → ~11%), then plateaus at 8–11% through N = 8 (10.2% observed vs 4.2% predicted, every paired t ≥ 7). Contact keeps improving in absolute terms (0.594 → 0.465 cm), so both interfaces benefit from scale and contact stays ahead. On rotation the margin even <em>grows</em> from N = 3 to N = 8 (7.9% → 11.7%; it starts at 15.6% at N = 1). On broader buckets, however, it does decay: on moving chunks it falls 11.0% → 4.2%, almost exactly the halving prediction, and on mean error it settles near 6%. The defensible claim is therefore specific: <strong>contact's advantage persists with scale where the action actually determines the outcome</strong>, and shrinks elsewhere.</p></div>
 </section>
 
 <!-- ============================ C5 ============================ -->
@@ -1292,7 +1302,14 @@ variants: wrist cameras only; gap ÷ real scene motion ("skill")</code></pre></d
 <tr><td>ContactGWM ablations designed but not yet run</td><td><code>cf_sep</code> / <code>cf_full</code> channels (data already stored); a 2D-projected contact baseline ("why 3D"); contact density (1/4/16/64 points); a model-level δ sweep; contact noise and dropout robustness; multi-object scenes; richer interactions (speed changes, reversals, toppling); a model-level near-miss test; an object split held out from training.</td></tr>
 </tbody></table></div>
 
-<h2 id="credits">Credits &amp; provenance</h2>
+<h2 id="credits">Code, papers &amp; credits</h2>
+<h3>Code and data</h3>
+<ul>
+  <li><a href="https://github.com/kunaltilaganji/world-models">kunaltilaganji/world-models</a>: ContactGWM code and results, the geometric-verification and latent-gap experiments with their pre-registrations, the gap predictor, and the full rollout-video library (imagined vs real).</li>
+  <li><a href="https://github.com/NU-World-Model-Embodied-AI/Flash-WAM">Flash-WAM</a> (distillation code and RoboTwin checkpoint) and <a href="https://github.com/Robbyant/lingbot-va">LingBot-VA</a> (the teacher): the upstream projects this work builds on.</li>
+  <li>Pre-registrations (committed before each confirmation dataset existed): gripper chatter, latent gap and test-time scaling, in the <code>world-models</code> repository.</li>
+</ul>
+<h3>Credits &amp; provenance</h3>
 <ul class="small">
   <li><strong>LingBot-VA</strong> (Robbyant; arXiv 2601.21998; Apache-2.0) and <strong>Flash-WAM</strong> (Akbari et al., 2026; arXiv 2606.05254; Flash-WAM code under CC BY-NC 4.0) are the work of their authors. This page reports our independent replication and follow-up studies. Numbers marked "published" are theirs.</li>
   <li>Methods replicated or used: Mean Flow Distillation (arXiv 2606.11155), Gated GeoBoN (arXiv 2607.17454; no official code, our reimplementation), OpenD4RT, VGGT-Ω. Baselines discussed: DexWM (arXiv 2511.01177), μ₀ (arXiv 2606.13769).</li>
