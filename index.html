@@ -162,6 +162,7 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--border);font-
     <li><a href="#s-sigma">A6 · What the action stream sees</a></li>
     <li><a href="#s-cross">A7 · L<sub>cross</sub> cross-modal loss</a></li>
     <li><a href="#s-meanflow">A8 · MeanFlow + L<sub>cross</sub></a></li>
+    <li><a href="#s-interval">A9 · Interval accuracy of students</a></li>
     <li class="grp">B · Knowing when a WAM is wrong</li>
     <li><a href="#s-d4rt">B1 · D4RT cycle consistency</a></li>
     <li><a href="#s-geobon">B2 · GeoBoN cross-view depth</a></li>
@@ -186,7 +187,7 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--border);font-
   <div class="kicker">Research log · world models for robot manipulation</div>
   <h1>Fast, checkable and embodiment-agnostic world models</h1>
   <p class="lede">Every study we ran, with its hypothesis, design, setup, models and data, the numbers we got, and whether they support or contradict what we expected. That includes the ones that failed.</p>
-  <p class="meta">Last updated 13 October 2026 · 4 × RTX A6000 (48 GB) · 650+ GPU-hours of training and evaluation · ~1,000 world-model rollouts in simulation · 72 ContactGWM training runs</p>
+  <p class="meta">Last updated 22 October 2026 · 4 × RTX A6000 (48 GB) · 650+ GPU-hours of training and evaluation · ~1,000 world-model rollouts in simulation · 72 ContactGWM training runs</p>
 </header>
 
 <p>The work runs in three threads.</p>
@@ -206,6 +207,7 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--border);font-
   <div class="card"><div class="big">σ ≈ 0.13</div><div class="lab">Effective noise of the student's one-step video, a level that gets 1.2% of video training weight</div></div>
   <div class="card"><div class="big">+2 pts</div><div class="lab">L<sub>cross</sub> on 25 RoboTwin tasks: 37.6% vs 35.6% (p = 0.71), not significant</div></div>
   <div class="card"><div class="big">70.8% vs 37.6%</div><div class="lab">MeanFlow + L<sub>cross</sub> vs LCM + L<sub>cross</sub>, 25 tasks × 10 episodes; controls pending</div></div>
+  <div class="card"><div class="big">0.61–0.78×</div><div class="lab">Error on the deployed intermediate jump vs the full jump for LCM students: easier, not harder (pre-registered, 96 contexts)</div></div>
 </div>
 
 <h2 id="map">All studies at a glance</h2>
@@ -220,6 +222,7 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--border);font-
 <tr><td><a href="#s-sigma">A6</a></td><td>One-step video seen by the action stream</td><td>How far off is the video the actions condition on at deployment, and can training see it?</td><td><span class="chip mid">◐ Gap real; effect unclear</span></td><td>σ<sub>v,eff</sub> ≈ 0.13, a level with 1.2% of training weight; 0 noisy-action → noisy-video edges in training</td></tr>
 <tr><td><a href="#s-cross">A7</a></td><td>L<sub>cross</sub> (cross-modal consistency)</td><td>Does training the actions on the model's own one-step video raise success?</td><td><span class="chip no">✗ No significant gain</span></td><td>37.6% vs 35.6% (25 tasks × 10, p = 0.71)</td></tr>
 <tr><td><a href="#s-meanflow">A8</a></td><td>MeanFlow + L<sub>cross</sub></td><td>Does an average-velocity target beat LCM at the same budget?</td><td><span class="chip mid">◐ +33 pts · controls pending</span></td><td>70.8% vs 37.6% (25 tasks × 10, p = 1 × 10⁻¹³)</td></tr>
+<tr><td><a href="#s-interval">A9</a></td><td>Interval accuracy of few-step students</td><td>Are students worse on the intermediate jump they take at deployment, and does it reach the action?</td><td><span class="chip no">✗ Refuted</span></td><td>Intermediate jump 0.61–0.78× the full-jump error; final action error ≈ 0.006 for every model (pre-registered, 96 contexts)</td></tr>
 <tr><td><a href="#s-d4rt">B1</a></td><td>OpenD4RT cycle consistency</td><td>Does 3D-tracking consistency of imagined video predict success?</td><td><span class="chip no">✗ Refuted</span></td><td>ρ = −0.01 (150 rollouts); balanced AUC 0.51</td></tr>
 <tr><td><a href="#s-geobon">B2</a></td><td>GeoBoN cross-view depth</td><td>Does head/wrist depth agreement predict success?</td><td><span class="chip no">✗ Refuted</span></td><td>Matched vs mismatched views: AUC 0.50–0.53</td></tr>
 <tr><td><a href="#s-chatter">B3</a></td><td>Gripper chatter</td><td>Do hesitant gripper actions flag failure?</td><td><span class="chip no">✗ Not confirmed</span></td><td>0.79 in discovery, 0.60 on fresh data (p = 0.066)</td></tr>
@@ -829,7 +832,82 @@ footer{margin-top:4em;padding-top:1.2em;border-top:1px solid var(--border);font-
 </tbody><caption>Norm of the Δ-embedding's contribution to the per-block modulation, as a percentage of the time embedding's (Δ = t − r in schedule units; Δ = 1,000 is the one-step video jump). After 1,000 steps the new layers' weights average |w| ≈ 0.5–1.9 × 10⁻⁴. A zero-initialised layer at the fine-tuning LR of 5e-6 barely moves.</caption></table></div>
 
 <div class="verdict mid"><p><span class="vt">Strongly in favour, with two controls pending.</span> RQ1: training was stable: finite losses throughout, grad norm 0.54–0.64 across 100-step windows, no skipped steps. RQ2: <strong>70.8% vs 37.6%</strong> for LCM + L<sub>cross</sub> and 35.6% for the LCM baseline, the same matrix, seeds and pass count (p = 1.1 × 10⁻¹³). MeanFlow wins on every horizon, and by as much on the 19 tasks outside the distillation data (+36 points) as on the 6 inside it (+23). RQ3: <strong>barely</strong>. The Δ-embedding contributes ≤ 1% of the time embedding, so the gain cannot come from conditioning on r. The likely source is the objective itself: dense supervision on teacher velocities at every noise level (including r = t flow matching), and targets on exactly the deployed intervals. That attribution is untested. RQ4: cheaper per step than LCM + L<sub>cross</sub> on the same hardware (62 vs 100 s).</p>
-<p>Pending controls: (1) the LCM students were evaluated about a week earlier, before the inference code gained the r input. The change is a no-op for plain models in unit tests but has not been re-run on the real model, so a few baseline tasks need re-running. (2) The LCM baseline trained on 25% fewer samples (A7); this does not apply to LCM + L<sub>cross</sub>. One training run per method and 10 episodes per task.</p></div>
+<p>Pending controls: (1) the LCM students were evaluated about a week earlier, before the inference code gained the r input. The change is a no-op for plain models in unit tests and, since A9, verified bit-identical on the real LCM and Flash-WAM students (A9, S2); the task-level re-run of a few baseline tasks has not been done. (2) The LCM baseline trained on 25% fewer samples (A7); this does not apply to LCM + L<sub>cross</sub>. One training run per method and 10 episodes per task.</p></div>
+</section>
+
+<section class="study" id="s-interval">
+<div class="study-head"><h3>A9 · Interval accuracy: are few-step students worse on the jumps they actually take?</h3><span class="chip no">✗ Refuted (pre-registered)</span></div>
+
+<p>At 1v/2a the action stream takes two jumps, σ = 1 → 0.5 → 0. Few-step students are trained mostly to land at σ = 0, so the intermediate jump might be one they never really learned. We measured, offline and without the simulator, how accurately each student performs every jump it could take along the teacher's own denoising path. Every model reads the same ground-truth video and history (condition <strong>C1</strong>), so the error is jump accuracy alone. The predictions, thresholds, tests and analysis script were committed before the confirmatory run.</p>
+
+<div class="facts">
+  <div class="k">Hypothesis</div><div><p>Students trained to land at σ = 0 are markedly worse on the intermediate deployed jump (1 → 0.5), that error carries into the final action, and the MeanFlow student of A8, which is trained on the deployed intervals, avoids it.</p></div>
+  <div class="k">Research questions</div><div><ul>
+    <li><strong>RQ1 (P1)</strong> Is the intermediate jump at least 2× worse than the full jump for the LCM-type students?</li>
+    <li><strong>RQ2 (P2)</strong> Is the MeanFlow student better than each of them on that jump?</li>
+    <li><strong>RQ3 (P3)</strong> Does jump error reach the final action?</li>
+    <li><strong>RQ4 (P4)</strong> Does the MeanFlow student use r? (descriptive)</li></ul></div>
+  <div class="k">Experimental design</div><div><ul>
+    <li>Students are queried at points z<sub>T</sub>(t) on the teacher's own path. <strong>M1</strong> = ‖u<sub>S</sub> − U<sub>T</sub>‖² / ‖U<sub>T</sub>‖² on valid action channels, where u<sub>S</sub> is the velocity from the student's real one-call sampler step (an Euler step for every LingBot-VA student; r is passed only to MeanFlow) and U<sub>T</sub> is the teacher's true average velocity over [r, t].</li>
+    <li>Grid: all 10 jumps between σ ∈ {1, 0.75, 0.5, 0.25, 0}, plus 20 jumps to σ = 0.</li>
+    <li>Deployed chains: <strong>M2</strong> = landing error after 1 → 0.5, normalised by the teacher's own move; <strong>M3</strong> = final action error; <strong>M4</strong> = M3 minus M3 with an oracle restart of the second jump from the teacher's z(0.5).</li>
+    <li>The context is the unit (4 noise draws averaged). One-sided paired Wilcoxon tests, Holm-corrected within each prediction; bootstrap 95% CIs over contexts (10,000 resamples).</li></ul></div>
+  <div class="k">Setup</div><div><p>A read-only harness drives the LingBot-VA server's own code: history via its KV-cache update, ground-truth video written in the video loop's final cache pass (C1), and its sampler step. Its re-creation of the server's inference is bit-identical to the server's own (S1). The teacher reference is 400 Euler steps in fp32. M1 uses fp32 compute, with bf16 (as deployed) as a secondary table; M2–M4 come from the real bf16 deployed chains. About 25 GPU-hours on 2 GPUs, inference only.</p></div>
+  <div class="k">Models &amp; data</div><div><p>Teacher <code>lingbot-va-posttrain-robotwin</code>; students: public Flash-WAM, <code>baseline_s1000</code> (LCM), <code>cross_s1000</code> (LCM + L<sub>cross</sub>), <code>meanflow_s1000</code> (MeanFlow + L<sub>cross</sub>); exploratory: the two 400-step students. 96 contexts from <code>robotwin-clean-and-aug-lerobot</code>: 24 training episodes of the 6 distillation tasks, 24 new (clean) episodes of the same tasks, and 48 from 12 tasks outside the distillation data (stratified 5 H1 / 5 H2 / 2 H3, half clean). One mid-episode chunk per context, 4 noise draws; 8 debugging contexts excluded from the analysis.</p></div>
+</div>
+
+<h4>Sanity checks (all on 8 debugging contexts)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>S1 · harness vs the server's own inference</td><td>Bit-identical for LCM + L<sub>cross</sub> (video guidance 5), Flash-WAM (guidance 1) and MeanFlow (r passed)</td></tr>
+<tr><td>S2 · r-capable inference code vs the A7 code</td><td>Bit-identical for the LCM and Flash-WAM students (16/16 each). This answers A8's first pending control at the model level.</td></tr>
+<tr><td>S3 · numerical floor of the teacher reference (400 vs 800 steps)</td><td>At most 3.9% of the best student's M1 at any jump (needs &lt; 10%)</td></tr>
+<tr><td>S5 · teacher plus freshly attached Δ-embeddings</td><td>Bit-identical to the teacher for random r</td></tr>
+<tr><td>S6 · MeanFlow at r = t vs the teacher's velocity</td><td>≈ 0.5% RMS apart: at r = t the action stream barely moved from the teacher</td></tr>
+<tr><td>S7 · determinism</td><td>16/16 identical on rerun</td></tr>
+<tr><td>S8 · bf16 vs fp32</td><td>bf16 shifts M1 by ~42%: its forward-pass noise is as large as the students' errors, so M1 is measured in fp32</td></tr>
+</tbody></table></div>
+
+<h4>Results · pre-registered predictions (96 contexts)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Prediction</th><th>Result</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr class="hl"><td><strong>P1</strong> M1(1 → 0.5) ≥ 2 × M1(1 → 0) for Flash-WAM, LCM, LCM + L<sub>cross</sub></td><td>Ratio 0.71 [0.66, 0.74], 0.61 [0.57, 0.64], 0.78 [0.75, 0.81]: the intermediate jump is <em>easier</em>. Holm p = 1.0</td><td><span class="chip no">✗ Fail</span></td></tr>
+<tr><td><strong>P2</strong> MeanFlow lower M1(1 → 0.5) than each of them</td><td>Lower than Flash-WAM (p<sub>Holm</sub> = 9 × 10⁻¹⁵) and LCM + L<sub>cross</sub> (1 × 10⁻¹⁵), roughly half their error; not lower than plain LCM, which is slightly better (p<sub>Holm</sub> = 0.93)</td><td><span class="chip no">✗ Fail</span></td></tr>
+<tr><td><strong>P3</strong> M4 &gt; 0 and Spearman(M2, M3) &gt; 0.3</td><td>M4 ≤ 0 for all three (restarting from the teacher's true midpoint does not help); ρ = −0.09, 0.43, 0.45</td><td><span class="chip no">✗ Fail</span></td></tr>
+<tr><td><strong>P4</strong> MeanFlow barely uses r</td><td>Its r-sensitivity at t = 1 is 73% [65%, 76%] of what the teacher's path requires, but that requirement is tiny (0.34%)</td><td><span class="chip mid">◐ Not as predicted</span></td></tr>
+</tbody><caption>Registered reading for "P1 fails": no interval mismatch; drop the interval story. Brackets are bootstrap 95% CIs over contexts.</caption></table></div>
+
+<h4>Results · jump error M1 on the coarse grid (fp32, median)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Model</th><th class="n">1 → 0.75</th><th class="n">1 → 0.5 ★</th><th class="n">1 → 0</th><th class="n">0.75 → 0.5</th><th class="n">0.5 → 0.25</th><th class="n">0.5 → 0 ★</th><th class="n">0.25 → 0</th></tr></thead>
+<tbody>
+<tr><td>Flash-WAM (public)</td><td class="n">7.0e-5</td><td class="n">7.0e-5</td><td class="n">1.0e-4</td><td class="n">1.9e-5</td><td class="n">2.6e-5</td><td class="n">9.0e-5</td><td class="n">2.2e-4</td></tr>
+<tr><td>LCM</td><td class="n"><strong>3.5e-5</strong></td><td class="n"><strong>3.5e-5</strong></td><td class="n"><strong>5.4e-5</strong></td><td class="n">2.3e-5</td><td class="n">3.6e-5</td><td class="n">9.6e-5</td><td class="n">2.2e-4</td></tr>
+<tr><td>LCM + L<sub>cross</sub></td><td class="n">7.8e-5</td><td class="n">7.7e-5</td><td class="n">9.6e-5</td><td class="n">2.2e-5</td><td class="n">2.7e-5</td><td class="n">8.4e-5</td><td class="n">2.2e-4</td></tr>
+<tr><td>MeanFlow + L<sub>cross</sub></td><td class="n">7.6e-5</td><td class="n">3.7e-5</td><td class="n">1.1e-4</td><td class="n"><strong>7.1e-6</strong></td><td class="n"><strong>7.3e-6</strong></td><td class="n"><strong>8.2e-5</strong></td><td class="n"><strong>2.0e-4</strong></td></tr>
+<tr><td class="muted">LCM, 400 steps</td><td class="n">9.8e-5</td><td class="n">9.8e-5</td><td class="n">1.2e-4</td><td class="n">1.8e-5</td><td class="n">4.1e-5</td><td class="n">1.0e-4</td><td class="n">2.3e-4</td></tr>
+<tr><td class="muted">LCM + L<sub>cross</sub>, 400 steps</td><td class="n">1.3e-4</td><td class="n">1.3e-4</td><td class="n">1.5e-4</td><td class="n">1.4e-5</td><td class="n">3.6e-5</td><td class="n">9.5e-5</td><td class="n">2.3e-4</td></tr>
+<tr><td class="muted">Teacher, one Euler step</td><td class="n">2.5e-4</td><td class="n">2.5e-4</td><td class="n">2.8e-4</td><td class="n">2.7e-6</td><td class="n">4.5e-6</td><td class="n">7.4e-5</td><td class="n">2.1e-4</td></tr>
+</tbody><caption>★ = deployed 1v/2a jumps; bold = best student. An M1 of 1e-4 is a 1% RMS velocity error. Every student matches or beats the teacher's own one-step error from t = 1. For LCM-type students the velocity does not depend on r, so their first three columns differ only through the teacher's U<sub>T</sub>; the near-equal values show that the teacher's action path from σ = 1 is almost straight.</caption></table></div>
+
+<figure><img src="assets/fig/4_interval_m1_heatmaps.png" alt="Heatmaps of jump error M1 over start t and end r for each student and the teacher's one-step jump, with the deployed 1v/2a jumps outlined in red" loading="lazy"><figcaption>Jump error over (start t, end r), median over 96 contexts, shared log colour scale; red boxes are the deployed 1v/2a jumps. No student is worse on the intermediate jump 1 → 0.5 than on 1 → 0.</figcaption></figure>
+<figure><img src="assets/fig/5_interval_endpoint_curve.png" alt="Jump error for jumps to sigma zero against the start t, one line per student plus the teacher's one-step error" loading="lazy"><figcaption>Endpoint curve (jumps to σ = 0). All students track the teacher's own one-step error, except at t = 1, where distillation clearly improved on the teacher. Error rises steeply for jumps that start close to clean, for every model.</figcaption></figure>
+
+<h4>Results · deployed 1v/2a chains (bf16, median)</h4>
+<div class="table-wrap"><table>
+<thead><tr><th>Model</th><th class="n">M2 landing at 0.5</th><th class="n">M3 final action</th><th class="n">M3 vs ground truth</th><th class="n">M4 carry-over</th><th class="n">M3 at 1v/1a</th></tr></thead>
+<tbody>
+<tr><td>MeanFlow + L<sub>cross</sub></td><td class="n"><strong>0.0069</strong></td><td class="n">0.0058</td><td class="n">0.0066</td><td class="n">−1.2e-5</td><td class="n">0.0126</td></tr>
+<tr><td>LCM</td><td class="n">0.0085</td><td class="n">0.0062</td><td class="n">0.0070</td><td class="n">−1.3e-5</td><td class="n">0.0107</td></tr>
+<tr><td>Flash-WAM (public)</td><td class="n">0.0103</td><td class="n">0.0061</td><td class="n">0.0067</td><td class="n">−3.5e-5</td><td class="n">0.0132</td></tr>
+<tr><td>LCM + L<sub>cross</sub></td><td class="n">0.0114</td><td class="n">0.0060</td><td class="n">0.0067</td><td class="n">−4.9e-5</td><td class="n">0.0138</td></tr>
+<tr><td class="muted">Teacher at 1v/2a (A1 control)</td><td class="n">0.0148</td><td class="n">0.0065</td><td class="n">0.0067</td><td class="n">—</td><td class="n">—</td></tr>
+</tbody><caption>M3 is an RMS error in normalised action units (actions have RMS ≈ 0.72, so 0.006 ≈ 0.8%). The same pattern holds in each of the three groups (training episodes, new episodes of trained tasks, untrained tasks). The 400-step students are slightly worse on M2 than their 1,000-step versions, with no sign that jump accuracy degrades with longer training.</caption></table></div>
+
+<div class="verdict no"><p><span class="vt">No interval mismatch under clean video; the interval story is dropped, as pre-registered.</span> RQ1: the intermediate deployed jump is <strong>easier</strong> than the full jump for every student (ratio 0.61–0.78, every CI below 1). With ground-truth video the teacher's action path from σ = 1 is nearly straight, so a velocity trained for 1 → 0 also serves 1 → 0.5. RQ2: MeanFlow is clearly the most accurate on short intermediate jumps (about 2–6× lower error) and lands closest after the first deployed step, but it is not better than plain LCM on the 1 → 0.5 jump itself. RQ3: no carry-over. Restarting from the teacher's true midpoint does not improve the final action, and every model, including the untrained teacher at 1v/2a, reproduces the teacher's final action to about 0.8% RMS. RQ4: MeanFlow's r-sensitivity reaches 73% of what the path needs, which explains how a Δ-embedding of ≤ 1% of the time embedding (A8) can be enough: very little r-dependence is needed.</p>
+<p><strong>What this means for A8.</strong> MeanFlow's +33 points of task success are not explained by action-stream jump accuracy under clean video. The leading candidate is the video side: how the action stream reacts to each student's own one-step video (condition C2, not yet run) and the conditioning gap of A6. Limits: one mid-episode chunk per context, C1 only, LingBot-VA students only (the Fast-WAM / RealtimeWAM family is planned).</p></div>
 </section>
 
 <h2 id="thread-b">Thread B · Knowing when a world action model is wrong</h2>
@@ -1519,6 +1597,7 @@ variants: wrist cameras only; gap ÷ real scene motion ("skill")</code></pre></d
   <li><strong>Decide the test before you see the data.</strong> Gripper chatter (0.79 → 0.60) and the latent gap (0.85 → 0.80) looked equally strong in discovery. Only a pre-registered test told them apart.</li>
   <li><strong>Find the cheap baseline first.</strong> The teacher at 17 passes (A5), constant-velocity extrapolation (C2) and "little imagined change" (B5) were all baselines nobody reported, and each one reframed a result.</li>
   <li><strong>Check what each stream can see before writing a loss for it.</strong> Our first cross-modal loss would have been a no-op: the training mask hides the noisy video from the action stream (A6).</li>
+  <li><strong>Check the measurement floor before reading a difference.</strong> In A9 the students' jump errors (~1%) were the size of bf16's own forward-pass noise. Only an fp32 control (S8) and a step-halving check (S3) showed that the first heatmaps were pure rounding.</li>
   <li><strong>Label configurations by what actually ran.</strong> Several of our own logs called a 1v/2a run (5 passes) "4 passes". This page uses the true counts.</li>
 </ol>
 
@@ -1534,6 +1613,8 @@ variants: wrist cameras only; gap ÷ real scene motion ("skill")</code></pre></d
 <tr><td>Porting MFD</td><td>Per-rank (r, t) draws gave different ODE substep counts per GPU, so FSDP all-gathers deadlocked after a 600 s watchdog with no traceback. The first smoke test only ran auxiliary steps and proved nothing.</td><td>(r, t) seeded from (seed, step, cycle) with a self-check; force 1:1 alternation in smoke tests.</td></tr>
 <tr><td>Our distillation checkpoints</td><td>The trainer writes <code>config.json</code> from <code>dict(model.config)</code>, which keeps diffusers' private <code>_use_default_values</code> list. Any key in that list is reset to its default on load. A new flag such as <code>meanflow: true</code> is therefore dropped, and the MeanFlow student loads as a plain model that ignores r; the only sign is a "weights not used" warning.</td><td>Drop <code>_use_default_values</code> when saving, as <code>save_pretrained</code> does. The server refuses a MeanFlow run on a non-MeanFlow checkpoint.</td></tr>
 <tr><td>Our 25-task eval runner (v1)</td><td>The policy server grew in memory across tasks and ran out of memory before the last horizon. This lost H3 twice, so the 400-step baseline has only 21 of 25 tasks (A7). In v2, <code>pkill -f</code> on the server name also matches any unrelated shell whose command line contains that string.</td><td>Restart the server for every task (v2); stop servers by PID.</td></tr>
+<tr><td>Our A9 reference paths</td><td>Integrating the teacher's 100-step reference with the server's bf16 sampler step rounds the state to ~0.004 after every 0.01-sized step. The error accumulates, and short-jump velocities divide it by a small gap: every student and the teacher's own one-step jump came out identical.</td><td>Keep the Euler state in fp32 (400 steps) and take each student's velocity from its fp32 output; check 400 vs 800 steps.</td></tr>
+<tr><td>LingBot-VA server sharding</td><td><code>_configure_model</code> calls <code>shard_model</code> with its default mixed-precision policy, so the model computes in bf16 even when its weights are loaded in fp32.</td><td>Pass the dtype through to <code>shard_model</code> when fp32 compute is intended.</td></tr>
 <tr><td>SAPIEN kinematics</td><td><code>set_pose</code> on a kinematic body → zero contacts, and the actor passes through. Holding the target across a record interval turns a 5 cm/s push into a 1.25 m/s impact that the velocity filter drops.</td><td><code>set_kinematic_target</code>, advanced every substep; assert that objects move.</td></tr>
 <tr><td>SAPIEN geometry</td><td>Capsules are x-aligned, but clouds were sampled along z, so the training embodiment had 87% zero-contact chunks (14.3 → 92.5 contacts per chunk after the fix). Static-vs-kinematic pairs report no contacts.</td><td>Validate every actor cloud against its collision shape; keep one body dynamic.</td></tr>
 <tr><td>SAPIEN processes</td><td>A <code>sapien.Scene</code> per episode exhausts Vulkan contexts; <code>fork</code> multiprocessing deadlocks.</td><td>Reuse one scene per (model, actor); use <code>spawn</code>, one actor per process.</td></tr>
@@ -1548,7 +1629,8 @@ variants: wrist cameras only; gap ÷ real scene motion ("skill")</code></pre></d
 <tr><td>Does the free "little imagined change" signal hold on fresh data?</td><td>Found post hoc in B5. It needs its own pre-registered test.</td></tr>
 <tr><td>Does the latent gap generalise to other WAMs or genuinely unseen tasks? Can a running-average alarm catch failures early enough to retry?</td><td>Untested. Confirmed only for Flash-WAM on 5 in-training RoboTwin tasks.</td></tr>
 <tr><td>Why does MFD never close its <code>gap</code>?</td><td>Learning rate and sample construction ruled out (A3). Untested: the auxiliary:student turn ratio; a full-copy auxiliary model (needs &gt; 4 × 48 GB).</td></tr>
-<tr><td>Does A8's gain survive its controls, and where does it come from?</td><td>Pending: re-run a few baseline tasks with the current inference code. Ablations not yet run: MeanFlow without L<sub>cross</sub>; r = t only (pure flow matching onto the teacher); MeanFlow at 400 steps.</td></tr>
+<tr><td>Does A8's gain survive its controls, and where does it come from?</td><td>Model-level control done (A9, S2: bit-identical). Pending: re-run a few baseline tasks with the current inference code. A9 rules out action-stream jump accuracy under clean video as the source. Ablations not yet run: MeanFlow without L<sub>cross</sub>; r = t only (pure flow matching onto the teacher); MeanFlow at 400 steps.</td></tr>
+<tr><td>Is MeanFlow's advantage on the video side? (after A9)</td><td>Next: A9's condition C2, where each model reads its own one-step video, and the same interval map for the Fast-WAM / RealtimeWAM family. Neither run yet.</td></tr>
 <tr><td>Does an r-aware MeanFlow student do better still?</td><td>Prepared, not run: a separate learning rate for the Δ-embeddings (100× the base rate, 5e-4), which barely moved in A8. Needs 4 free GPUs for ~17 h.</td></tr>
 <tr><td>Why did the LCM students get worse from 400 to 1,000 steps (A7)?</td><td>Untested. The effective batch also changed (8 → 12/16).</td></tr>
 <tr><td>Ideas not yet tried</td><td>Smooth the teacher's trajectory with Gaussian filters at several scales (a scale pyramid) and let the student learn from a learned weighting of them, rather than mimicking a single trajectory; other variants of on-policy distillation for world action models.</td></tr>
@@ -1568,11 +1650,11 @@ variants: wrist cameras only; gap ÷ real scene motion ("skill")</code></pre></d
   <li><strong>LingBot-VA</strong> (Robbyant; arXiv 2601.21998; Apache-2.0) and <strong>Flash-WAM</strong> (Akbari et al., 2026; arXiv 2606.05254; Flash-WAM code under CC BY-NC 4.0) are the work of their authors. This page reports our independent replication and follow-up studies. Numbers marked "published" are theirs.</li>
   <li>Methods replicated or used: Mean Flow Distillation (arXiv 2606.11155), MeanFlow-style average-velocity training with an interval-splitting target (SplitMeanFlow), Gated GeoBoN (arXiv 2607.17454; no official code, our reimplementation), OpenD4RT, VGGT-Ω. Baselines discussed: DexWM (arXiv 2511.01177), μ₀ (arXiv 2606.13769).</li>
   <li>Benchmarks and simulators: RoboTwin 2.0, LIBERO, ManiSkill3 / SAPIEN, YCB objects.</li>
-  <li>Compute: 4 × NVIDIA RTX A6000 (48 GB), driver 550, CUDA 12.4. Distillation training 349.3 GPU-hours (A1–A3) plus 266.1 GPU-hours (A7–A8); verification experiments ~33 GPU-hours plus the latent-gap, predictor and test-time-scaling runs.</li>
+  <li>Compute: 4 × NVIDIA RTX A6000 (48 GB), driver 550, CUDA 12.4. Distillation training 349.3 GPU-hours (A1–A3) plus 266.1 GPU-hours (A7–A8) and ~25 GPU-hours of inference for A9; verification experiments ~33 GPU-hours plus the latent-gap, predictor and test-time-scaling runs.</li>
 </ul>
 
 <footer>
-  <p>Maintained by Kunal Tilaganji · Last updated 13 October 2026. Every number on this page comes from the project's result files and reports. Where a summary report and the raw results disagreed, the raw results were used and the discrepancy is noted.</p>
+  <p>Maintained by Kunal Tilaganji · Last updated 22 October 2026. Every number on this page comes from the project's result files and reports. Where a summary report and the raw results disagreed, the raw results were used and the discrepancy is noted.</p>
 </footer>
 </main>
 </div>
